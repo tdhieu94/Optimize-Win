@@ -26,6 +26,11 @@ public sealed partial class MainWindow : Window
 
         _pages.NavigateRequested += Select;
         _pages.RetryRequested += () => _ = CheckServiceAsync();
+        _pages.UpdateAvailable += version =>
+        {
+            UpdateBanner.Message = $"Optimize Win {version} đã sẵn sàng.";
+            UpdateBanner.IsOpen = true;
+        };
         Select("home");
         _ = CheckServiceAsync();
     }
@@ -60,6 +65,12 @@ public sealed partial class MainWindow : Window
         {
             ShowPage(key);
         }
+    }
+
+    private void OnUpdateBannerClick(object sender, RoutedEventArgs e)
+    {
+        UpdateBanner.IsOpen = false;
+        Select("home");
     }
 
     private void OnNavSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)

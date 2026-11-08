@@ -42,7 +42,23 @@ public interface IOwService
     /// through the safe executor. Undoable for the retention period.
     /// </summary>
     Task<CleanSummary> CleanJunkAsync(Guid scanId, IReadOnlyList<string> categoryIds, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Asks GitHub whether OW's own repository has a newer release. Sends nothing about this computer
+    /// beyond the HTTP request itself.
+    /// </summary>
+    Task<UpdateInfo> CheckForUpdateAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Downloads the release found by <see cref="CheckForUpdateAsync"/> (must match <paramref name="version"/>),
+    /// verifies its SHA-256 and starts the installer. The app and the service restart during the update.
+    /// </summary>
+    Task<UpdateStartResult> InstallUpdateAsync(string version, CancellationToken cancellationToken = default);
 }
+
+public sealed record UpdateInfo(string CurrentVersion, string? LatestVersion, bool Available, string? Notes, string? Error);
+
+public sealed record UpdateStartResult(bool Started, string Message);
 
 public sealed record JunkCategoryInfo(string Id, string Title, string Description, int FileCount, long Bytes);
 

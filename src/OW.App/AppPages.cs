@@ -23,6 +23,8 @@ internal sealed class AppPages
     private readonly StartupView _startup = new();
     private readonly CleanupView _cleanup = new();
     private readonly StackPanel _disks = new() { Spacing = 12 };
+    private readonly UpdateView _update = new();
+    private bool _checkedForUpdate;
 
     private readonly TextBlock _statusTitle = new() { FontSize = 16, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock _statusMessage = new() { TextWrapping = TextWrapping.Wrap, Opacity = 0.8 };
@@ -66,6 +68,13 @@ internal sealed class AppPages
 
     public event Action? RetryRequested;
 
+    /// <summary>A newer version was found (version text), so the window can show a banner on every page.</summary>
+    public event Action<string>? UpdateAvailable
+    {
+        add => _update.Available += value;
+        remove => _update.Available -= value;
+    }
+
     public AppPage Get(string key) => Pages.FirstOrDefault(p => p.Key == key) ?? Pages[0];
 
     public void Show(ServiceStatus status)
@@ -84,6 +93,12 @@ internal sealed class AppPages
         if (status.Level == StatusLevel.Info)
         {
             return;
+        }
+
+        if (status.Level == StatusLevel.Success && !_checkedForUpdate)
+        {
+            _checkedForUpdate = true;
+            _ = _update.CheckAsync(userAsked: false);
         }
 
         DiskCards.Fill(_disks, status.Disks);
@@ -162,6 +177,7 @@ internal sealed class AppPages
         panel.Children.Add(new TextBlock { Text = "Tổng quan", FontSize = 28, FontWeight = FontWeights.SemiBold });
         panel.Children.Add(Card(status));
         panel.Children.Add(tiles);
+        panel.Children.Add(_update.Root);
         panel.Children.Add(new TextBlock
         {
             Text = "Mọi thao tác dọn đều đi qua vùng cách ly và có thể hoàn tác trong 7 ngày.",

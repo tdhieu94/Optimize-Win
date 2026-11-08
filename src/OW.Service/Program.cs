@@ -68,6 +68,7 @@ builder.Services.AddSingleton(_ => PathGuard.CreateForCurrentMachine());
 builder.Services.AddSingleton<SafeExecutor>();
 builder.Services.AddSingleton<SpaceService>();
 builder.Services.AddSingleton<JunkService>();
+builder.Services.AddSingleton<UpdateService>();
 builder.Services.AddSingleton<OwServiceImpl>();
 builder.Services.AddSingleton<ClientVerifier>();
 builder.Services.AddHostedService<MaintenanceWorker>();

@@ -15,6 +15,7 @@
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
             <InfoBar
@@ -24,7 +25,19 @@
                 IsClosable="False"
                 Severity="Warning"
                 Margin="24,12,24,0" />
-            <ScrollViewer x:Name="Scroller" Grid.Row="1">
+            <InfoBar
+                x:Name="UpdateBanner"
+                Grid.Row="1"
+                IsOpen="False"
+                IsClosable="True"
+                Severity="Informational"
+                Title="Có bản mới"
+                Margin="24,12,24,0">
+                <InfoBar.ActionButton>
+                    <Button Content="Xem và cập nhật" Click="OnUpdateBannerClick" />
+                </InfoBar.ActionButton>
+            </InfoBar>
+            <ScrollViewer x:Name="Scroller" Grid.Row="2">
                 <ContentControl
                     x:Name="PageHost"
                     MaxWidth="960"

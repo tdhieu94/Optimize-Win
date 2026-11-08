@@ -35,7 +35,7 @@ if ($existing) {
 
 Write-Host "Đang chép chương trình vào $target ..."
 New-Item -ItemType Directory -Force -Path $target | Out-Null
-robocopy $source $target /MIR /NFL /NDL /NJH /NJS /NP /XF 'install.ps1' 'uninstall.ps1' 'Cai-dat.cmd' 'Go-cai-dat.cmd' | Out-Null
+robocopy $source $target /MIR /NFL /NDL /NJH /NJS /NP /XF 'install.ps1' 'uninstall.ps1' 'update.ps1' 'Cai-dat.cmd' 'Go-cai-dat.cmd' | Out-Null
 if ($LASTEXITCODE -ge 8) { throw "Chép file thất bại (robocopy mã $LASTEXITCODE)." }
 Copy-Item (Join-Path $source 'uninstall.ps1') $target -Force
 Copy-Item (Join-Path $source 'Go-cai-dat.cmd') $target -Force
@@ -56,6 +56,10 @@ $shortcut = $shell.CreateShortcut($shortcutPath)
 $shortcut.TargetPath = Join-Path $target 'OptimizeWin.exe'
 $shortcut.WorkingDirectory = $target
 $shortcut.Save()
+
+# Lets the app (and the updater) see which version is installed.
+$version = (Get-Item $serviceExe).VersionInfo.ProductVersion
+Set-Content -Path (Join-Path $target 'installed.txt') -Value $version -Encoding ASCII
 
 Write-Host ''
 Write-Host 'Cài đặt xong. Mở "Optimize Win" từ Start Menu.' -ForegroundColor Green
