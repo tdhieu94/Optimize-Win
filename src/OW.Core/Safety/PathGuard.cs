@@ -34,6 +34,8 @@ public readonly record struct PathCheck(bool Allowed, string? Reason)
 /// <item>System roots (Windows, Program Files, ...) can never be touched, whoever asks.</item>
 /// <item>User data roots (Documents, Pictures, ...) can only be touched when the user picked the path.</item>
 /// <item>Relative paths, "..", wildcards, network paths and drive roots are always refused.</item>
+/// <item>A few throw-away folders inside system roots (Windows\Temp, the Windows Update download cache,
+/// Windows error reports) may be touched below their top folder, and only by a cleanup rule, never by a user pick.</item>
 /// </list>
 /// </remarks>
 public sealed class PathGuard
@@ -46,14 +48,16 @@ public sealed class PathGuard
     private readonly StringComparison _cmp;
     private readonly string[] _systemRoots;
     private readonly string[] _userDataRoots;
+    private readonly string[] _ruleJunkRoots;
 
-    public PathGuard(PathStyle style, IEnumerable<string> systemRoots, IEnumerable<string> userDataRoots)
+    public PathGuard(PathStyle style, IEnumerable<string> systemRoots, IEnumerable<string> userDataRoots, IEnumerable<string>? ruleJunkRoots = null)
     {
         _style = style;
         _sep = style == PathStyle.Windows ? '\\' : '/';
         _cmp = style == PathStyle.Windows ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         _systemRoots = NormalizeRoots(systemRoots);
         _userDataRoots = NormalizeRoots(userDataRoots);
+        _ruleJunkRoots = NormalizeRoots(ruleJunkRoots ?? []);
     }
 
     /// <summary>Default guard for the machine the code runs on.</summary>
@@ -111,7 +115,17 @@ public sealed class PathGuard
             user.AddRange(PersonalFolderNames.Select(name => Path.Combine(profile, name)));
         }
 
-        return new PathGuard(PathStyle.Windows, system, user);
+        var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        var wer = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Microsoft", "Windows", "WER");
+        var junk = new List<string>
+        {
+            Path.Combine(windows, "Temp"),
+            Path.Combine(windows, "SoftwareDistribution", "Download"),
+            Path.Combine(wer, "ReportArchive"),
+            Path.Combine(wer, "ReportQueue"),
+        };
+
+        return new PathGuard(PathStyle.Windows, system, user, junk);
     }
 
     public PathCheck Check(string? path, ActionOrigin origin)
@@ -171,9 +185,13 @@ public sealed class PathGuard
             return PathCheck.Deny("Không được thao tác trên cả ổ đĩa.");
         }
 
+        // Only files strictly inside a junk folder, never the folder itself, and only for cleanup rules.
+        var ruleJunk = origin == ActionOrigin.Rule
+            && _ruleJunkRoots.Any(r => IsSameOrUnder(normalized, r) && !string.Equals(normalized, r, _cmp));
+
         foreach (var root in _systemRoots)
         {
-            if (IsSameOrUnder(normalized, root))
+            if (!ruleJunk && IsSameOrUnder(normalized, root))
             {
                 return PathCheck.Deny($"Thư mục hệ thống được bảo vệ: {root}");
             }

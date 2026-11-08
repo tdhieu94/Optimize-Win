@@ -4,6 +4,7 @@ Personal Windows 11 optimizer for one non-technical user (Hieu). UI text is Viet
 
 ## Hard rules
 - Every write to the user's machine goes through `OW.Core.Execution.SafeExecutor`: PathGuard check → journal Pending → act → journal outcome → undoable. Modules only build `ActionPlan`s.
+- PathGuard protects system roots (Windows, Program Files, ProgramData\Microsoft...). The only exceptions are the rule-only junk folders in `PathGuard.CreateForCurrentMachine` (Windows\Temp, SoftwareDistribution\Download, WER report folders): files strictly inside them, cleanup rules only, never user picks. Do not add to that list without tests.
 - Never permanently delete user files directly; quarantine them (7-day retention) so undo works.
 - The admin service exposes only typed methods in `OW.Contracts.IOwService`. Never add a method that runs arbitrary commands or takes arbitrary paths without going through SafeExecutor.
 - The service only talks to `OptimizeWin.exe` installed one folder above it (ClientVerifier). Do not weaken this.

@@ -96,3 +96,44 @@ public class PathGuardTests
         Assert.False(unix.Check("/", ActionOrigin.UserSelected).Allowed);
     }
 }
+
+public class PathGuardJunkFolderTests
+{
+    private static readonly PathGuard Guard = new(
+        PathStyle.Windows,
+        [@"C:\Windows", @"C:\ProgramData\Microsoft"],
+        [@"C:\Users\hieu\Documents"],
+        [@"C:\Windows\Temp", @"C:\Windows\SoftwareDistribution\Download", @"C:\ProgramData\Microsoft\Windows\WER\ReportArchive"]);
+
+    [Theory]
+    [InlineData(@"C:\Windows\Temp\setup.log")]
+    [InlineData(@"c:\windows\temp\sub\x.tmp")]
+    [InlineData(@"C:\Windows\SoftwareDistribution\Download\abc123\x.cab")]
+    [InlineData(@"C:\ProgramData\Microsoft\Windows\WER\ReportArchive\r1\Report.wer")]
+    public void Rules_may_clean_inside_windows_junk_folders(string path) =>
+        Assert.True(Guard.Check(path, ActionOrigin.Rule).Allowed);
+
+    [Theory]
+    [InlineData(@"C:\Windows\Temp\setup.log")]
+    [InlineData(@"C:\Windows\SoftwareDistribution\Download\abc123\x.cab")]
+    public void A_user_pick_still_cannot_touch_windows(string path) =>
+        Assert.False(Guard.Check(path, ActionOrigin.UserSelected).Allowed);
+
+    [Theory]
+    [InlineData(@"C:\Windows\Temp")]
+    [InlineData(@"C:\Windows\Temp\")]
+    [InlineData(@"C:\Windows\SoftwareDistribution\Download")]
+    [InlineData(@"C:\Windows\TempX\x.tmp")]
+    [InlineData(@"C:\Windows\Temp2\x.tmp")]
+    [InlineData(@"C:\Windows\SoftwareDistribution\DataStore\DataStore.edb")]
+    [InlineData(@"C:\Windows\System32\kernel32.dll")]
+    [InlineData(@"C:\Windows\Temp\..\System32\kernel32.dll")]
+    [InlineData(@"C:\WINDOW~1\Temp\x.tmp")]
+    [InlineData(@"C:\ProgramData\Microsoft\Windows\WER\Temp\x.tmp")]
+    public void Everything_else_in_windows_stays_protected(string path) =>
+        Assert.False(Guard.Check(path, ActionOrigin.Rule).Allowed);
+
+    [Fact]
+    public void Without_junk_folders_windows_temp_is_protected() =>
+        Assert.False(new PathGuard(PathStyle.Windows, [@"C:\Windows"], []).Check(@"C:\Windows\Temp\x.tmp", ActionOrigin.Rule).Allowed);
+}
