@@ -46,6 +46,7 @@ internal sealed class AppPages
         _historyTile = new Tile("", "Lịch sử & hoàn tác", "Chưa có lần dọn nào", "Xem lịch sử", () => NavigateRequested?.Invoke("history"));
 
         _duplicates.Removed += () => RetryRequested?.Invoke();
+        _startup.Changed += () => RetryRequested?.Invoke();
         var dupTile = new Tile("\uE8C8", "File trùng nhau", "Tìm ảnh, video, tài liệu bị lưu nhiều bản", "Tìm file trùng", () => NavigateRequested?.Invoke("duplicates"));
 
         _startup.Counted += (total, on) => _startupTile.Value = total == 0

@@ -39,4 +39,10 @@ public sealed record StartupEntry(
     bool IsEnabled,
     string? Publisher,
     bool ExecutableExists,
-    StartupAdvice Advice);
+    StartupAdvice Advice,
+    string ApprovalGroup = "",
+    string ApprovalName = "")
+{
+    /// <summary>True for entries of every user (HKLM, all-users Startup folder): changing them needs the service.</summary>
+    public bool IsMachineWide => Location is StartupLocation.MachineRegistry or StartupLocation.CommonStartupFolder;
+}

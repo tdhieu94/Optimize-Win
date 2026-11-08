@@ -95,7 +95,7 @@ public sealed class JunkService(SafeExecutor executor, TimeProvider time, ILogge
     }
 
     /// <summary>Profile folder of a Windows account, from the registry list Windows keeps of local profiles.</summary>
-    private static string? ProfileDirectory(string? userSid)
+    internal static string? ProfileDirectory(string? userSid)
     {
         if (string.IsNullOrEmpty(userSid) || !OperatingSystem.IsWindows())
         {

@@ -74,6 +74,20 @@ if (args.Contains("--self-test"))
         {
             Directory.Delete(dupDir, recursive: true);
         }
+
+        // The real startup switch store, on a made-up name that no program uses, then removed again.
+        var store = new RegistryStartupApprovalStore();
+        var probe = new OW.Core.Startup.StartupApprovalTarget(OW.Core.Startup.StartupScope.Machine, null, "Run", "OW-SelfTest-" + Guid.NewGuid().ToString("N"));
+        var before = store.Get(probe);
+        store.Set(probe, OW.Core.Startup.StartupApprovalValues.For(false, DateTime.UtcNow));
+        var off = store.Get(probe);
+        store.Set(probe, null);
+        var after = store.Get(probe);
+        Console.WriteLine($"Startup switch store: before={before is null}, off={off?[0]}, removed={after is null}");
+        if (before is not null || off is not { Length: 12 } || off[0] != 3 || after is not null)
+        {
+            return 1;
+        }
     }
 
     return disks.Count > 0 && scan.Root.FileCount > 0 ? 0 : 1;
@@ -88,10 +102,17 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton(_ => new SqliteJournal(paths.JournalFile));
 builder.Services.AddSingleton(_ => new QuarantineStore(paths.QuarantineDirectory, paths.DriveQuarantineFor));
 builder.Services.AddSingleton(_ => PathGuard.CreateForCurrentMachine());
-builder.Services.AddSingleton<SafeExecutor>();
+builder.Services.AddSingleton(sp => new SafeExecutor(
+    sp.GetRequiredService<SqliteJournal>(),
+    sp.GetRequiredService<QuarantineStore>(),
+    sp.GetRequiredService<PathGuard>(),
+    sp.GetRequiredService<TimeProvider>(),
+    sp.GetRequiredService<OW.Core.Startup.IStartupApprovalStore>()));
 builder.Services.AddSingleton<SpaceService>();
 builder.Services.AddSingleton<JunkService>();
 builder.Services.AddSingleton<DuplicateService>();
+builder.Services.AddSingleton<StartupService>();
+builder.Services.AddSingleton<OW.Core.Startup.IStartupApprovalStore, RegistryStartupApprovalStore>();
 builder.Services.AddSingleton<UpdateService>();
 builder.Services.AddSingleton<OwServiceImpl>();
 builder.Services.AddSingleton<ClientVerifier>();

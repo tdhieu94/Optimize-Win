@@ -3,18 +3,21 @@ using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using OW.Client;
+using OW.Contracts;
 using OW.Core.Startup;
 
 namespace OW.App;
 
 /// <summary>
-/// "Khởi động cùng Windows" section. Read-only for now: it lists what starts at sign-in and explains it.
-/// Turning items off comes in a later step, through the service and with undo.
+/// "Khởi động cùng Windows" section: lists what starts at sign-in, explains it, and turns items on or off
+/// through the service (Windows' own switch, journaled, undoable). Windows' own entries have no button.
 /// </summary>
 internal sealed class StartupView
 {
     private readonly StackPanel _list = new() { Spacing = 8 };
     private readonly TextBlock _summary = new() { TextWrapping = TextWrapping.Wrap, Opacity = 0.75 };
+    private readonly TextBlock _result = new() { TextWrapping = TextWrapping.Wrap, FontWeight = FontWeights.SemiBold };
 
     public StartupView()
     {
@@ -23,12 +26,15 @@ internal sealed class StartupView
 
         Root.Children.Add(new TextBlock
         {
-            Text = "Các chương trình tự mở khi bạn đăng nhập Windows. Càng nhiều thì máy khởi động càng chậm. Bản này chỉ xem, chưa tắt được.",
+            Text = "Các chương trình tự mở khi bạn đăng nhập Windows. Càng nhiều thì máy khởi động càng chậm. " +
+                   "Bấm \"Tắt\" để chương trình không tự mở nữa: OW dùng đúng công tắc của Windows (giống Task Manager), không xóa gì, " +
+                   "và bạn bật lại được bất cứ lúc nào. Mục của Windows không có nút tắt.",
             TextWrapping = TextWrapping.Wrap,
             Opacity = 0.75,
         });
         Root.Children.Add(refresh);
         Root.Children.Add(_summary);
+        Root.Children.Add(_result);
         Root.Children.Add(_list);
         _ = LoadAsync();
     }
@@ -37,6 +43,9 @@ internal sealed class StartupView
 
     /// <summary>Raised after each read with (total, enabled) so the overview page can show a summary.</summary>
     public event Action<int, int>? Counted;
+
+    /// <summary>Raised after a switch was changed, so the history page can refresh.</summary>
+    public event Action? Changed;
 
     private async Task LoadAsync()
     {
@@ -63,7 +72,54 @@ internal sealed class StartupView
         }
     }
 
-    private static Border Card(StartupEntry e)
+    private async Task ToggleAsync(StartupEntry e, Button button)
+    {
+        var enable = !e.IsEnabled;
+        if (!enable)
+        {
+            var extra = e.Advice == StartupAdvice.KeepHardware
+                ? "\n\nLưu ý: đây là phần mềm đi kèm phần cứng (âm thanh, đồ họa, bàn di chuột...). Tắt đi có thể làm mất một số phím tắt hoặc tính năng của thiết bị."
+                : string.Empty;
+            var dialog = new ContentDialog
+            {
+                XamlRoot = button.XamlRoot,
+                Title = $"Tắt \"{e.Name}\"?",
+                Content = "Lần đăng nhập Windows sau, chương trình này sẽ không tự mở nữa. Bạn vẫn mở nó bằng tay được như bình thường, và bật lại ở đây bất cứ lúc nào." + extra,
+                DefaultButton = ContentDialogButton.Close,
+                PrimaryButtonText = "Tắt",
+                CloseButtonText = "Thôi",
+            };
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+            {
+                return;
+            }
+        }
+
+        button.IsEnabled = false;
+        try
+        {
+            await using var client = await OwServiceClient.ConnectAsync(TimeSpan.FromSeconds(3));
+            var result = await client.Service.SetStartupEnabledAsync(new StartupChangeRequest(e.IsMachineWide, e.ApprovalGroup, e.ApprovalName, enable));
+            _result.Text = result.Message;
+            if (result.Changed)
+            {
+                Changed?.Invoke();
+            }
+        }
+        catch (TimeoutException)
+        {
+            _result.Text = "Chưa kết nối được dịch vụ OW. Bấm \"Kiểm tra lại\" ở trang Tổng quan rồi thử lại.";
+        }
+        catch (Exception ex)
+        {
+            CrashReporter.Write(ex);
+            _result.Text = $"Không đổi được: {ex.Message}";
+        }
+
+        await LoadAsync();
+    }
+
+    private Border Card(StartupEntry e)
     {
         var panel = new StackPanel { Spacing = 4 };
 
@@ -80,6 +136,14 @@ internal sealed class StartupView
         if (adviceText is not null)
         {
             header.Children.Add(Badge(adviceText, adviceColor));
+        }
+
+        // Windows' own entries can be turned back on if something else turned them off, but never off here.
+        if (!string.IsNullOrEmpty(e.ApprovalGroup) && (e.Advice != StartupAdvice.KeepWindows || !e.IsEnabled))
+        {
+            var toggle = new Button { Content = e.IsEnabled ? "Tắt" : "Bật", VerticalAlignment = VerticalAlignment.Center };
+            toggle.Click += (_, _) => _ = ToggleAsync(e, toggle);
+            header.Children.Add(toggle);
         }
 
         panel.Children.Add(header);

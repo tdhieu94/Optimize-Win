@@ -85,7 +85,9 @@ internal sealed class CleanupView
 
         var text = new TextBlock
         {
-            Text = string.Create(Vi, $"{b.CreatedUtc.ToLocalTime():dd/MM/yyyy HH:mm} · {b.Title}\n{b.Done} file · {Size(b.Bytes)} · {state}"),
+            Text = b.Title.Contains("khởi động:", StringComparison.Ordinal)
+                ? string.Create(Vi, $"{b.CreatedUtc.ToLocalTime():dd/MM/yyyy HH:mm} · {b.Title}\n{state}")
+                : string.Create(Vi, $"{b.CreatedUtc.ToLocalTime():dd/MM/yyyy HH:mm} · {b.Title}\n{b.Done} file · {Size(b.Bytes)} · {state}"),
             TextWrapping = TextWrapping.Wrap,
             VerticalAlignment = VerticalAlignment.Center,
         };

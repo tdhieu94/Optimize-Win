@@ -74,7 +74,20 @@ public interface IOwService
     /// every group must keep at least one copy, and every file is hashed again first.
     /// </summary>
     Task<CleanSummary> RemoveDuplicatesAsync(Guid scanId, IReadOnlyList<string> paths, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Turns one startup program on or off with Windows' own switch (like Task Manager). Nothing is deleted;
+    /// the change is journaled and can be undone. Windows' own entries cannot be turned off.
+    /// </summary>
+    Task<StartupChangeResult> SetStartupEnabledAsync(StartupChangeRequest request, CancellationToken cancellationToken = default);
 }
+
+/// <param name="MachineWide">True for entries of every user (HKLM Run or the all-users Startup folder).</param>
+/// <param name="Group">"Run", "Run32" or "StartupFolder".</param>
+/// <param name="ValueName">The Run value name, or the shortcut's file name.</param>
+public sealed record StartupChangeRequest(bool MachineWide, string Group, string ValueName, bool Enable);
+
+public sealed record StartupChangeResult(Guid BatchId, bool Changed, string Message);
 
 /// <param name="Stage">What the scan is doing now, in Vietnamese.</param>
 public sealed record DuplicateScanStatus(bool Running, long Files, long HashedBytes, string Stage, string Current, double Seconds, bool HasReport, string? Error);
