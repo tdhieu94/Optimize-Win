@@ -54,7 +54,43 @@ public interface IOwService
     /// verifies its SHA-256 and starts the installer. The app and the service restart during the update.
     /// </summary>
     Task<UpdateStartResult> InstallUpdateAsync(string version, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Read-only: starts looking for duplicate personal files (photos, videos, music, documents, archives)
+    /// on the given local drives, in the background. Takes only drive letters, never paths.
+    /// Returns false if another duplicate scan is still running.
+    /// </summary>
+    Task<bool> StartDuplicateScanAsync(IReadOnlyList<string> driveLetters, CancellationToken cancellationToken = default);
+
+    Task<DuplicateScanStatus> GetDuplicateScanStatusAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Result of the last finished duplicate scan, or null.</summary>
+    Task<DuplicateReport?> GetDuplicateReportAsync(CancellationToken cancellationToken = default);
+
+    Task CancelDuplicateScanAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Moves the chosen copies into quarantine (undoable). Only paths from report <paramref name="scanId"/> are accepted,
+    /// every group must keep at least one copy, and every file is hashed again first.
+    /// </summary>
+    Task<CleanSummary> RemoveDuplicatesAsync(Guid scanId, IReadOnlyList<string> paths, CancellationToken cancellationToken = default);
 }
+
+/// <param name="Stage">What the scan is doing now, in Vietnamese.</param>
+public sealed record DuplicateScanStatus(bool Running, long Files, long HashedBytes, string Stage, string Current, double Seconds, bool HasReport, string? Error);
+
+public sealed record DuplicateFileInfo(string Path, DateTime LastWriteUtc);
+
+public sealed record DuplicateGroupInfo(long SizeBytes, IReadOnlyList<DuplicateFileInfo> Files);
+
+public sealed record DuplicateReport(
+    Guid ScanId,
+    IReadOnlyList<string> DriveLetters,
+    IReadOnlyList<DuplicateGroupInfo> Groups,
+    long WastedBytes,
+    long FilesCompared,
+    long SkippedProgramFolders,
+    double Seconds);
 
 public sealed record UpdateInfo(string CurrentVersion, string? LatestVersion, bool Available, string? Notes, string? Error);
 

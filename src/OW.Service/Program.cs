@@ -51,6 +51,29 @@ if (args.Contains("--self-test"))
         {
             return 1;
         }
+
+        // Duplicate search on a throw-away folder (read-only), including a program folder that must be skipped.
+        var dupDir = Path.Combine(Path.GetTempPath(), "ow-selftest-dup-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(dupDir, "Game"));
+        try
+        {
+            var bytes = new byte[2 * 1024 * 1024];
+            Random.Shared.NextBytes(bytes);
+            File.WriteAllBytes(Path.Combine(dupDir, "a.jpg"), bytes);
+            File.WriteAllBytes(Path.Combine(dupDir, "b.jpg"), bytes);
+            File.WriteAllBytes(Path.Combine(dupDir, "Game", "c.jpg"), bytes);
+            File.WriteAllText(Path.Combine(dupDir, "Game", "game.exe"), "x");
+            var dups = OW.Core.Duplicates.DuplicateFinder.Find([dupDir]);
+            Console.WriteLine($"Duplicate scan of {dupDir}: {dups.Groups.Count} group(s), {dups.FilesSeen} files, {dups.SkippedProgramFolders} program folder(s) skipped");
+            if (dups.Groups.Count != 1 || dups.Groups[0].Files.Count != 2 || dups.SkippedProgramFolders != 1)
+            {
+                return 1;
+            }
+        }
+        finally
+        {
+            Directory.Delete(dupDir, recursive: true);
+        }
     }
 
     return disks.Count > 0 && scan.Root.FileCount > 0 ? 0 : 1;
@@ -63,11 +86,12 @@ var paths = ServicePaths.CreateDefault();
 builder.Services.AddSingleton(paths);
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton(_ => new SqliteJournal(paths.JournalFile));
-builder.Services.AddSingleton(_ => new QuarantineStore(paths.QuarantineDirectory));
+builder.Services.AddSingleton(_ => new QuarantineStore(paths.QuarantineDirectory, paths.DriveQuarantineFor));
 builder.Services.AddSingleton(_ => PathGuard.CreateForCurrentMachine());
 builder.Services.AddSingleton<SafeExecutor>();
 builder.Services.AddSingleton<SpaceService>();
 builder.Services.AddSingleton<JunkService>();
+builder.Services.AddSingleton<DuplicateService>();
 builder.Services.AddSingleton<UpdateService>();
 builder.Services.AddSingleton<OwServiceImpl>();
 builder.Services.AddSingleton<ClientVerifier>();

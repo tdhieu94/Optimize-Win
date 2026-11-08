@@ -84,6 +84,22 @@ public sealed class PathGuard
             @"C:\$Recycle.Bin",
         };
 
+        // OW's own quarantine folder, the recycle bin and restore points on every drive.
+        try
+        {
+            system.AddRange(DriveInfo.GetDrives()
+                .Where(d => d.DriveType == DriveType.Fixed)
+                .SelectMany(d => new[]
+                {
+                    Path.Combine(d.Name, OW.Core.Execution.QuarantineStore.DriveFolderName),
+                    Path.Combine(d.Name, "$Recycle.Bin"),
+                    Path.Combine(d.Name, "System Volume Information"),
+                }));
+        }
+        catch (IOException)
+        {
+        }
+
         var user = new List<string>
         {
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),

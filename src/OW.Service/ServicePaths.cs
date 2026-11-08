@@ -32,6 +32,57 @@ public sealed class ServicePaths
         return new ServicePaths(dir);
     }
 
+    private readonly HashSet<string> _driveQuarantines = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Lock _driveGate = new();
+
+    /// <summary>
+    /// The quarantine folder on the drive of <paramref name="path"/> (for example E:\OptimizeWin.Quarantine),
+    /// created hidden and locked down the first time. Null for drives that are not local fixed drives.
+    /// </summary>
+    public string? DriveQuarantineFor(string path)
+    {
+        try
+        {
+            var root = Path.GetPathRoot(Path.GetFullPath(path));
+            if (string.IsNullOrEmpty(root) || root.Length != 3 || root[1] != ':')
+            {
+                return null;
+            }
+
+            var drive = new DriveInfo(root);
+            if (drive.DriveType != DriveType.Fixed || !drive.IsReady)
+            {
+                return null;
+            }
+
+            var dir = Path.Combine(drive.RootDirectory.FullName, OW.Core.Execution.QuarantineStore.DriveFolderName);
+            lock (_driveGate)
+            {
+                if (_driveQuarantines.Add(dir))
+                {
+                    try
+                    {
+                        CreateLockedDown(dir);
+                    }
+                    catch (Exception ex) when (ex is UnauthorizedAccessException or PlatformNotSupportedException or InvalidOperationException or IOException)
+                    {
+                        // A drive without permissions (exFAT/FAT32): still keep files on that drive, just not locked down.
+                        Directory.CreateDirectory(dir);
+                    }
+
+                    var info = new DirectoryInfo(dir);
+                    info.Attributes |= FileAttributes.Hidden | FileAttributes.System;
+                }
+            }
+
+            return dir;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>
     /// Only SYSTEM and Administrators may read or change OW's data. Ordinary programs cannot
     /// tamper with the journal or read quarantined files.
