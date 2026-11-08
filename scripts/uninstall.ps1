@@ -21,6 +21,8 @@ if ($existing) {
     sc.exe delete $serviceName | Out-Null
 }
 
+Unregister-ScheduledTask -TaskName 'OptimizeWin Health Check' -Confirm:$false -ErrorAction SilentlyContinue
+
 Remove-Item (Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'Optimize Win.lnk') -ErrorAction SilentlyContinue
 
 # This script may itself live in $target, so remove the folder after it exits.

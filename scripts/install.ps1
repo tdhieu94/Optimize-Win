@@ -57,6 +57,26 @@ $shortcut.TargetPath = Join-Path $target 'OptimizeWin.exe'
 $shortcut.WorkingDirectory = $target
 $shortcut.Save()
 
+Write-Host 'Đang đặt lịch kiểm tra ổ đĩa (khi đăng nhập và mỗi thứ Hai)...'
+# Runs "OptimizeWin.exe --check" as whoever is signed in: it only reads disk info and shows a
+# Windows notification when a drive is nearly full or a disk looks unhealthy. It never cleans anything.
+$taskName = 'OptimizeWin Health Check'
+try {
+    $users = (New-Object Security.Principal.SecurityIdentifier 'S-1-5-32-545').Translate([Security.Principal.NTAccount]).Value
+    $action = New-ScheduledTaskAction -Execute (Join-Path $target 'OptimizeWin.exe') -Argument '--check' -WorkingDirectory $target
+    $atLogon = New-ScheduledTaskTrigger -AtLogOn
+    $atLogon.Delay = 'PT3M'
+    $weekly = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday -At '10:00'
+    $taskPrincipal = New-ScheduledTaskPrincipal -GroupId $users -RunLevel Limited
+    $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+        -ExecutionTimeLimit (New-TimeSpan -Minutes 10) -MultipleInstances IgnoreNew
+    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger @($atLogon, $weekly) -Principal $taskPrincipal -Settings $settings `
+        -Description 'Optimize Win: kiểm tra dung lượng và sức khỏe ổ đĩa, chỉ báo, không tự dọn.' -Force | Out-Null
+} catch {
+    # The app works without it; only the automatic warnings are missing.
+    Write-Host "Không đặt được lịch kiểm tra: $_" -ForegroundColor Yellow
+}
+
 # Lets the app (and the updater) see which version is installed.
 $version = (Get-Item $serviceExe).VersionInfo.ProductVersion
 Set-Content -Path (Join-Path $target 'installed.txt') -Value $version -Encoding ASCII

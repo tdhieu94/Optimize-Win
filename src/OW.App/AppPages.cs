@@ -24,6 +24,7 @@ internal sealed class AppPages
     private readonly CleanupView _cleanup = new();
     private readonly DuplicatesView _duplicates = new();
     private readonly StackPanel _disks = new() { Spacing = 12 };
+    private readonly StackPanel _alerts = new() { Spacing = 8 };
     private readonly UpdateView _update = new();
     private bool _checkedForUpdate;
 
@@ -108,6 +109,7 @@ internal sealed class AppPages
         }
 
         DiskCards.Fill(_disks, status.Disks);
+        ShowAlerts(status);
         _space.SetDrives(status.Disks);
         _duplicates.SetDrives(status.Disks);
         _diskTile.Value = DiskSummary(status.Disks);
@@ -123,6 +125,35 @@ internal sealed class AppPages
                 ? "Chưa có lần dọn nào"
                 : string.Create(Vi, $"Lần gần nhất: {last.CreatedUtc.ToLocalTime():dd/MM HH:mm}, {last.Done} file");
         }
+    }
+
+    /// <summary>Warnings at the top of the overview (drive nearly full, disk health). Showing them here counts as "seen".</summary>
+    private void ShowAlerts(ServiceStatus status)
+    {
+        _alerts.Children.Clear();
+        if (status.Level != StatusLevel.Success)
+        {
+            return;
+        }
+
+        var alerts = HealthCheck.Evaluate(status.Disks);
+        foreach (var a in alerts)
+        {
+            var open = new Button { Content = a.PageKey == "disks" ? "Xem ổ đĩa" : "Dọn rác" };
+            var key = a.PageKey;
+            open.Click += (_, _) => NavigateRequested?.Invoke(key);
+            _alerts.Children.Add(new InfoBar
+            {
+                Title = a.Title,
+                Message = a.Message,
+                Severity = a.Level == OW.Core.Health.AlertLevel.Critical ? InfoBarSeverity.Error : InfoBarSeverity.Warning,
+                IsOpen = true,
+                IsClosable = false,
+                ActionButton = key == "home" ? null : open,
+            });
+        }
+
+        HealthCheck.MarkSeen(alerts);
     }
 
     private static string DiskSummary(IReadOnlyList<DiskInfo> disks)
@@ -183,6 +214,7 @@ internal sealed class AppPages
         var panel = new StackPanel { Spacing = 16 };
         panel.Children.Add(new TextBlock { Text = "Tổng quan", FontSize = 28, FontWeight = FontWeights.SemiBold });
         panel.Children.Add(Card(status));
+        panel.Children.Add(_alerts);
         panel.Children.Add(tiles);
         panel.Children.Add(_update.Root);
         panel.Children.Add(new TextBlock
