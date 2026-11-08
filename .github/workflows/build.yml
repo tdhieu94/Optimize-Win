@@ -101,8 +101,14 @@ jobs:
           foreach ($run in 1, 2) {
             $p = Start-Process -FilePath $exe -ArgumentList '--check' -WorkingDirectory (Split-Path $exe) -PassThru
             if (-not $p.WaitForExit(60000)) {
-              Get-Content (Join-Path $dir 'check.log') -ErrorAction SilentlyContinue
+              $last = (Get-Content (Join-Path $dir 'check.log') -ErrorAction SilentlyContinue | Select-Object -Last 1)
               Stop-Process -Id $p.Id -Force
+              # Windows Server runners may not support app notifications; then OW opens its window instead (by design).
+              if ($run -eq 1 -and $last -match 'opening the window') {
+                Write-Host '::warning::Notifications are not available on this runner; --check opened the window instead (expected fallback).'
+                continue
+              }
+              Get-Content (Join-Path $dir 'check.log') -ErrorAction SilentlyContinue
               throw "--check run $run did not finish within 60 seconds"
             }
             Write-Host "--check run $run exited with code $($p.ExitCode)"
@@ -110,7 +116,7 @@ jobs:
           $log = Get-Content (Join-Path $dir 'check.log')
           $log
           if (Test-Path (Join-Path $dir 'crash.log')) { Get-Content (Join-Path $dir 'crash.log'); throw '--check reported an error' }
-          if (-not ($log -match 'Notification shown')) { throw 'The test alert was not shown as a notification' }
+          if (-not ($log -match 'Notification shown|opening the window')) { throw 'The test alert was neither notified nor shown in the window' }
           if (-not ($log[-1] -match ', 0 to announce')) { throw 'The second check announced the same alert again' }
 
       - name: Space scan timing (read-only, C:\Windows, as SYSTEM-like admin)

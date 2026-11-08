@@ -90,6 +90,7 @@ internal static class HealthCheck
         {
             if (!AppNotificationManager.IsSupported())
             {
+                Log("Windows says app notifications are not supported here");
                 return false;
             }
 
@@ -108,7 +109,13 @@ internal static class HealthCheck
 
             var notification = builder.BuildNotification();
             AppNotificationManager.Default.Show(notification);
-            return notification.Id != 0;
+            if (notification.Id == 0)
+            {
+                Log("Windows did not accept the notification (notifications may be turned off for OW)");
+                return false;
+            }
+
+            return true;
         }
         catch (Exception ex)
         {
