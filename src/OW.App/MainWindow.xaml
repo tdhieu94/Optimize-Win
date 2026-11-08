@@ -26,6 +26,9 @@
                 <TextBlock Text="Đang đọc thông tin ổ đĩa..." Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             </StackPanel>
 
+            <TextBlock Text="Dung lượng" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,16,0,0" />
+            <StackPanel x:Name="SpacePanel" />
+
             <TextBlock Text="Lịch sử dọn dẹp" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,16,0,0" />
             <TextBlock
                 x:Name="HistoryText"

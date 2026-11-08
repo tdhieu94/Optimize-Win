@@ -15,7 +15,26 @@ public interface IOwService
 
     /// <summary>Read-only: physical disks, their health readings and the drives (C:, D:, ...) on each.</summary>
     Task<IReadOnlyList<DiskInfo>> GetDisksAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Read-only: measures which folders use the most space on one local drive.
+    /// Takes only a drive letter ("C"), never a path. Can take a few minutes on a full drive.
+    /// </summary>
+    Task<SpaceReport> AnalyzeSpaceAsync(string driveLetter, CancellationToken cancellationToken = default);
 }
+
+/// <summary>One folder or file in a space report. <see cref="Path"/> is null for an "other items" summary row.</summary>
+public sealed record SpaceItem(string Name, string? Path, bool IsFolder, long SizeBytes, long FileCount, IReadOnlyList<SpaceItem> Children);
+
+public sealed record SpaceReport(
+    string DriveLetter,
+    long DriveSizeBytes,
+    long DriveFreeBytes,
+    SpaceItem Root,
+    IReadOnlyList<SpaceItem> LargestFiles,
+    long FolderCount,
+    long InaccessibleFolders,
+    double Seconds);
 
 public static class OwPipe
 {

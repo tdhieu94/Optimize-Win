@@ -5,9 +5,12 @@ namespace OW.App;
 
 public sealed partial class MainWindow : Window
 {
+    private readonly SpaceView _space = new();
+
     public MainWindow()
     {
         InitializeComponent();
+        SpacePanel.Children.Add(_space.Root);
         TryUseMica();
         AppWindow.Resize(new Windows.Graphics.SizeInt32(900, 640));
         _ = CheckServiceAsync();
@@ -61,6 +64,7 @@ public sealed partial class MainWindow : Window
         if (status.Level != StatusLevel.Info)
         {
             DiskCards.Fill(DisksPanel, status.Disks);
+            _space.SetDrives(status.Disks);
         }
     }
 }

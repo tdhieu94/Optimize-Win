@@ -6,7 +6,7 @@ using OW.Core.Journal;
 namespace OW.Service;
 
 /// <summary>The service side of <see cref="IOwService"/>. Every write goes through <see cref="SafeExecutor"/>.</summary>
-public sealed class OwServiceImpl(SqliteJournal journal, SafeExecutor executor, ILogger<OwServiceImpl> logger) : IOwService
+public sealed class OwServiceImpl(SqliteJournal journal, SafeExecutor executor, SpaceService space, ILogger<OwServiceImpl> logger) : IOwService
 {
     private static readonly DateTimeOffset Started = DateTimeOffset.UtcNow;
 
@@ -39,6 +39,9 @@ public sealed class OwServiceImpl(SqliteJournal journal, SafeExecutor executor, 
 
     public Task<IReadOnlyList<DiskInfo>> GetDisksAsync(CancellationToken cancellationToken = default) =>
         Task.Run(DiskInspector.GetDisks, cancellationToken);
+
+    public Task<SpaceReport> AnalyzeSpaceAsync(string driveLetter, CancellationToken cancellationToken = default) =>
+        space.AnalyzeAsync(driveLetter, cancellationToken);
 
     public async Task<UndoSummary> UndoBatchAsync(Guid batchId, CancellationToken cancellationToken = default)
     {
