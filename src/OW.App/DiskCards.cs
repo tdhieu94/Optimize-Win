@@ -61,7 +61,7 @@ internal static class DiskCards
         {
             panel.Children.Add(new TextBlock
             {
-                Text = $"Ổ số {d.Number} · {d.MediaType} {d.BusType} · {Size(d.SizeBytes)}",
+                Text = $"Ổ số {d.Number} · {Kind(d)} · {Size(d.SizeBytes)}",
                 Opacity = 0.7,
             });
         }
@@ -128,5 +128,17 @@ internal static class DiskCards
         return bytes >= 1024 * Gb
             ? string.Create(Vi, $"{bytes / (1024 * Gb):0.##} TB")
             : string.Create(Vi, $"{bytes / Gb:0.#} GB");
+    }
+
+    /// <summary>"SSD NVMe", "SSD, cắm qua USB", "Ổ cứng, cắm qua USB" (Windows may not know the type of a USB drive).</summary>
+    private static string Kind(DiskInfo d)
+    {
+        var kind = d.MediaType is "SSD" or "HDD" or "SCM" ? d.MediaType : "Ổ cứng";
+        return d.BusType switch
+        {
+            "USB" => $"{kind}, cắm qua USB",
+            "Khác" or "" => kind,
+            _ => $"{kind} {d.BusType}",
+        };
     }
 }
