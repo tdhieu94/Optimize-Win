@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/OW.App/OW.App.csproj" />
+    <Project Path="src/OW.Client/OW.Client.csproj" />
+    <Project Path="src/OW.Contracts/OW.Contracts.csproj" />
+    <Project Path="src/OW.Core/OW.Core.csproj" />
+    <Project Path="src/OW.Service/OW.Service.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/OW.Core.Tests/OW.Core.Tests.csproj" />
+  </Folder>
+</Solution>

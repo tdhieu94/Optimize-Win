@@ -1,0 +1,42 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Test safety layer
+        run: dotnet test tests/OW.Core.Tests/OW.Core.Tests.csproj -c Release
+
+      - name: Publish service
+        run: dotnet publish src/OW.Service/OW.Service.csproj -c Release -r win-x64 --self-contained -o out/OptimizeWin/Service
+
+      - name: Publish app
+        run: dotnet publish src/OW.App/OW.App.csproj -c Release -r win-x64 --self-contained -p:Platform=x64 -o out/OptimizeWin
+
+      - name: Add install scripts
+        shell: pwsh
+        run: |
+          Copy-Item scripts/install.ps1, scripts/uninstall.ps1, scripts/Cai-dat.cmd, scripts/Go-cai-dat.cmd out/OptimizeWin/
+          if (-not (Test-Path out/OptimizeWin/OptimizeWin.exe)) { throw 'OptimizeWin.exe missing' }
+          if (-not (Test-Path out/OptimizeWin/Service/OptimizeWin.Service.exe)) { throw 'service exe missing' }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OptimizeWin-${{ github.sha }}
+          path: out/OptimizeWin
+          retention-days: 30
