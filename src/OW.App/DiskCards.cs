@@ -57,11 +57,14 @@ internal static class DiskCards
         });
         panel.Children.Add(header);
 
-        panel.Children.Add(new TextBlock
+        if (d.Number >= 0)
         {
-            Text = $"Ổ số {d.Number} · {d.MediaType} {d.BusType} · {Size(d.SizeBytes)}",
-            Opacity = 0.7,
-        });
+            panel.Children.Add(new TextBlock
+            {
+                Text = $"Ổ số {d.Number} · {d.MediaType} {d.BusType} · {Size(d.SizeBytes)}",
+                Opacity = 0.7,
+            });
+        }
 
         var facts = new List<string>();
         if (d.TemperatureC is int t)

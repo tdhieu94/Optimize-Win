@@ -12,7 +12,57 @@ public static class DiskInspector
 {
     private const string StorageScope = @"\\.\root\Microsoft\Windows\Storage";
 
+    /// <summary>Disk number used for drives whose physical disk Windows does not report.</summary>
+    public const int UnknownDiskNumber = -1;
+
     public static IReadOnlyList<DiskInfo> GetDisks()
+    {
+        List<DiskInfo> result;
+        try
+        {
+            result = ReadPhysicalDisks();
+        }
+        catch (Exception ex) when (ex is ManagementException or System.Runtime.InteropServices.COMException or UnauthorizedAccessException)
+        {
+            result = [];
+        }
+
+        // Virtual machines and Windows Sandbox often report no physical disks at all.
+        // Still show every fixed drive letter so the user sees free space.
+        var shown = result.SelectMany(d => d.Volumes).Select(v => v.DriveLetter).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var orphans = DriveInfo.GetDrives()
+            .Where(d => d.DriveType == DriveType.Fixed)
+            .Select(d => char.ToUpperInvariant(d.Name[0]))
+            .Where(c => char.IsAsciiLetter(c) && !shown.Contains($"{c}:"))
+            .Order()
+            .Select(ReadVolume)
+            .Where(v => v is not null)
+            .Cast<VolumeInfo>()
+            .ToList();
+
+        if (orphans.Count > 0)
+        {
+            result.Add(new DiskInfo(
+                UnknownDiskNumber,
+                "Ổ đĩa (không rõ phần cứng)",
+                "Không rõ",
+                "Khác",
+                orphans.Sum(v => v.SizeBytes),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                nameof(HealthVerdict.Unknown),
+                ["Windows không cho biết thông tin phần cứng của ổ này (thường gặp trong Windows Sandbox hoặc máy ảo), nên chỉ hiện dung lượng."],
+                orphans));
+        }
+
+        return result;
+    }
+
+    private static List<DiskInfo> ReadPhysicalDisks()
     {
         var scope = new ManagementScope(StorageScope);
         scope.Connect();
