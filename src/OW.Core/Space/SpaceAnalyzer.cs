@@ -19,6 +19,35 @@ public sealed record SpaceScan(
     long SkippedLinks,
     TimeSpan Duration);
 
+/// <summary>Live counters a scan updates while it runs, so the UI can show progress. Safe to read from another thread.</summary>
+public sealed class SpaceScanProgress
+{
+    private long _files;
+    private long _bytes;
+    private long _folders;
+    private string _currentFolder = string.Empty;
+
+    public long Files => Interlocked.Read(ref _files);
+
+    public long Bytes => Interlocked.Read(ref _bytes);
+
+    public long Folders => Interlocked.Read(ref _folders);
+
+    public string CurrentFolder => Volatile.Read(ref _currentFolder);
+
+    internal void EnterFolder(string path)
+    {
+        Interlocked.Increment(ref _folders);
+        Volatile.Write(ref _currentFolder, path);
+    }
+
+    internal void AddFile(long length)
+    {
+        Interlocked.Increment(ref _files);
+        Interlocked.Add(ref _bytes, length);
+    }
+}
+
 public sealed record SpaceScanOptions
 {
     /// <summary>A folder's contents are listed only if it holds at least this share of the whole scan...</summary>
@@ -58,7 +87,7 @@ public static class SpaceAnalyzer
         AttributesToSkip = 0,
     };
 
-    public static SpaceScan Scan(string rootPath, SpaceScanOptions? options = null, CancellationToken cancellationToken = default)
+    public static SpaceScan Scan(string rootPath, SpaceScanOptions? options = null, CancellationToken cancellationToken = default, SpaceScanProgress? progress = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(rootPath);
         options ??= new SpaceScanOptions();
@@ -69,7 +98,7 @@ public static class SpaceAnalyzer
             throw new DirectoryNotFoundException(rootPath);
         }
 
-        var walker = new Walker(options.LargestFilesCount, options.MaxChildren, cancellationToken);
+        var walker = new Walker(options.LargestFilesCount, options.MaxChildren, progress ?? new SpaceScanProgress(), cancellationToken);
         var tree = walker.Measure(root, isRoot: true);
 
         var budget = new NodeBudget(options.MaxNodes);
@@ -135,7 +164,7 @@ public static class SpaceAnalyzer
     /// </remarks>
     private sealed record Measured(string Name, bool IsFolder, long Size, long Files, List<Measured>? Items, long OtherSize = 0, long OtherCount = 0);
 
-    private sealed class Walker(int largestCount, int keepFiles, CancellationToken token)
+    private sealed class Walker(int largestCount, int keepFiles, SpaceScanProgress progress, CancellationToken token)
     {
         public PriorityQueue<SpaceNode, long> Largest { get; } = new();
 
@@ -149,6 +178,7 @@ public static class SpaceAnalyzer
         {
             token.ThrowIfCancellationRequested();
             Folders++;
+            progress.EnterFolder(dir.FullName);
             var name = isRoot ? dir.FullName : dir.Name;
 
             List<FileSystemInfo> entries;
@@ -193,6 +223,7 @@ public static class SpaceAnalyzer
                     }
 
                     size += length;
+                    progress.AddFile(length);
                     files++;
                     fileItems.Add(new Measured(f.Name, false, length, 1, null));
                     Track(f, length);
