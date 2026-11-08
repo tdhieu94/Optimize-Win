@@ -64,6 +64,16 @@ jobs:
               Format-List TimeCreated, ProviderName, Id, Message
             throw 'OptimizeWin.exe closed by itself during start-up'
           }
+          # Screenshot for reviewing the UI (best effort; never fails the build).
+          try {
+            Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+            $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+            [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+            New-Item -ItemType Directory -Force out/screenshots | Out-Null
+            $bmp.Save("out/screenshots/main-window.png")
+            Write-Host "Saved screenshot $($b.Width)x$($b.Height)"
+          } catch { Write-Host "Screenshot skipped: $_" }
           Stop-Process -Id $p.Id -Force
           # An error dialog keeps the process alive, so a crash log also counts as a failure.
           if ($hadCrash) { throw 'The main window reported an error (see crash.log above)' }
@@ -96,3 +106,11 @@ jobs:
           name: OptimizeWin-${{ github.sha }}
           path: out/OptimizeWin
           retention-days: 30
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots-${{ github.sha }}
+          path: out/screenshots
+          if-no-files-found: ignore
+          retention-days: 7

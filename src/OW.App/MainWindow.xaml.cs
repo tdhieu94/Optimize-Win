@@ -1,22 +1,32 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 
 namespace OW.App;
 
 public sealed partial class MainWindow : Window
 {
-    private readonly SpaceView _space = new();
-    private readonly CleanupView _cleanup = new();
+    private readonly AppPages _pages = new();
 
     public MainWindow()
     {
         InitializeComponent();
-        SpacePanel.Children.Add(_space.Root);
-        StartupPanel.Children.Add(new StartupView().Root);
-        CleanPanel.Children.Add(_cleanup.CleanRoot);
-        HistoryPanel.Children.Add(_cleanup.HistoryRoot);
         TryUseMica();
-        AppWindow.Resize(new Windows.Graphics.SizeInt32(900, 640));
+        AppWindow.Resize(new Windows.Graphics.SizeInt32(1180, 780));
+
+        foreach (var page in _pages.Pages)
+        {
+            Nav.MenuItems.Add(new NavigationViewItem
+            {
+                Content = page.Title,
+                Tag = page.Key,
+                Icon = new FontIcon { Glyph = page.Glyph, FontFamily = new FontFamily("Segoe Fluent Icons") },
+            });
+        }
+
+        _pages.NavigateRequested += Select;
+        _pages.RetryRequested += () => _ = CheckServiceAsync();
+        Select("home");
         _ = CheckServiceAsync();
     }
 
@@ -39,36 +49,45 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void OnRetryClick(object sender, RoutedEventArgs e) => _ = CheckServiceAsync();
+    private void Select(string key)
+    {
+        var item = Nav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => (string)i.Tag == key);
+        if (item is not null && !ReferenceEquals(Nav.SelectedItem, item))
+        {
+            Nav.SelectedItem = item; // Raises SelectionChanged, which shows the page.
+        }
+        else
+        {
+            ShowPage(key);
+        }
+    }
+
+    private void OnNavSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
+    {
+        if (args.SelectedItem is NavigationViewItem { Tag: string key })
+        {
+            ShowPage(key);
+        }
+    }
+
+    private void ShowPage(string key)
+    {
+        PageHost.Content = _pages.Get(key).Content;
+        Scroller.ChangeView(null, 0, null, disableAnimation: true);
+    }
 
     private async Task CheckServiceAsync()
     {
-        RetryButton.IsEnabled = false;
         Show(ServiceStatus.Checking);
         Show(await ServiceStatus.QueryAsync());
-        RetryButton.IsEnabled = true;
     }
 
     private void Show(ServiceStatus status)
     {
-        StatusBar.Severity = status.Level switch
-        {
-            StatusLevel.Success => InfoBarSeverity.Success,
-            StatusLevel.Warning => InfoBarSeverity.Warning,
-            StatusLevel.Error => InfoBarSeverity.Error,
-            _ => InfoBarSeverity.Informational,
-        };
-        StatusBar.Title = status.Title;
-        StatusBar.Message = status.Message;
-        if (status.Batches is not null)
-        {
-            _cleanup.ShowHistory(status.Batches);
-        }
-
-        if (status.Level != StatusLevel.Info)
-        {
-            DiskCards.Fill(DisksPanel, status.Disks);
-            _space.SetDrives(status.Disks);
-        }
+        _pages.Show(status);
+        ServiceBanner.IsOpen = status.Level is StatusLevel.Warning or StatusLevel.Error;
+        ServiceBanner.Severity = status.Level == StatusLevel.Error ? InfoBarSeverity.Error : InfoBarSeverity.Warning;
+        ServiceBanner.Title = status.Title;
+        ServiceBanner.Message = status.Message;
     }
 }

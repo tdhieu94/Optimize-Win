@@ -35,6 +35,9 @@ internal sealed class StartupView
 
     public StackPanel Root { get; } = new() { Spacing = 8 };
 
+    /// <summary>Raised after each read with (total, enabled) so the overview page can show a summary.</summary>
+    public event Action<int, int>? Counted;
+
     private async Task LoadAsync()
     {
         _summary.Text = "Đang đọc...";
@@ -50,6 +53,8 @@ internal sealed class StartupView
             {
                 _list.Children.Add(Card(e));
             }
+
+            Counted?.Invoke(entries.Count, on);
         }
         catch (Exception ex)
         {

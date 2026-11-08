@@ -23,6 +23,7 @@ internal sealed class CleanupView
     private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, Opacity = 0.8 };
     private readonly StackPanel _categories = new() { Spacing = 6 };
     private readonly StackPanel _history = new() { Spacing = 6 };
+    private readonly TextBlock _historyStatus = new() { TextWrapping = TextWrapping.Wrap, FontWeight = FontWeights.SemiBold };
     private readonly List<(CheckBox Box, JunkCategoryInfo Info)> _boxes = [];
     private Guid _scanId;
 
@@ -38,7 +39,7 @@ internal sealed class CleanupView
 
         CleanRoot.Children.Add(new TextBlock
         {
-            Text = "Tìm file rác an toàn để dọn. File không bị xóa ngay mà được chuyển vào vùng cách ly 7 ngày: trong thời gian đó bạn có thể bấm \"Hoàn tác\" ở phần Lịch sử để lấy lại. Sau 7 ngày chỗ trống mới được giải phóng hẳn.",
+            Text = "Tìm file rác an toàn để dọn. File không bị xóa ngay mà được chuyển vào vùng cách ly 7 ngày: trong thời gian đó bạn có thể bấm \"Hoàn tác\" ở trang Lịch sử để lấy lại. Sau 7 ngày chỗ trống mới được giải phóng hẳn.",
             TextWrapping = TextWrapping.Wrap,
             Opacity = 0.75,
         });
@@ -46,6 +47,7 @@ internal sealed class CleanupView
         CleanRoot.Children.Add(_categories);
         CleanRoot.Children.Add(_status);
 
+        HistoryRoot.Children.Add(_historyStatus);
         HistoryRoot.Children.Add(_history);
         ShowHistory([]);
     }
@@ -186,7 +188,7 @@ internal sealed class CleanupView
             Title = "Dọn rác?",
             Content = string.Create(
                 Vi,
-                $"{chosen.Sum(c => c.FileCount):N0} file ({Size(chosen.Sum(c => c.Bytes))}) sẽ được chuyển vào vùng cách ly.\n\nTrong 7 ngày bạn có thể bấm \"Hoàn tác\" ở phần Lịch sử để lấy lại toàn bộ."),
+                $"{chosen.Sum(c => c.FileCount):N0} file ({Size(chosen.Sum(c => c.Bytes))}) sẽ được chuyển vào vùng cách ly.\n\nTrong 7 ngày bạn có thể bấm \"Hoàn tác\" ở trang Lịch sử để lấy lại toàn bộ."),
             DefaultButton = ContentDialogButton.Close,
             PrimaryButtonText = "Dọn",
             CloseButtonText = "Thôi",
@@ -205,7 +207,7 @@ internal sealed class CleanupView
             var result = await client.Service.CleanJunkAsync(_scanId, chosen.Select(c => c.Id).ToList());
             _status.Text = result.BatchId == Guid.Empty
                 ? result.Message
-                : $"{result.Message} ({Size(result.Bytes)}). Muốn lấy lại thì bấm \"Hoàn tác\" ở phần Lịch sử.";
+                : $"{result.Message} ({Size(result.Bytes)}). Muốn lấy lại thì bấm \"Hoàn tác\" ở trang Lịch sử.";
             _categories.Children.Clear();
             _boxes.Clear();
             ShowHistory(await client.Service.GetHistoryAsync(20));
@@ -243,13 +245,13 @@ internal sealed class CleanupView
                 text += "\n" + string.Join("\n", result.Messages.Take(5));
             }
 
-            _status.Text = text;
+            _historyStatus.Text = text;
             ShowHistory(await client.Service.GetHistoryAsync(20));
         }
         catch (Exception ex)
         {
             CrashReporter.Write(ex);
-            _status.Text = $"Không hoàn tác được: {ex.Message}";
+            _historyStatus.Text = $"Không hoàn tác được: {ex.Message}";
             button.IsEnabled = true;
         }
     }

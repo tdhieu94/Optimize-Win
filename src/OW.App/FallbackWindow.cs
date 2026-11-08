@@ -1,81 +1,65 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
 
 namespace OW.App;
 
 /// <summary>
-/// A plain window built in code, with no XAML file and no theme resources.
-/// Used only if the main window fails to load, so the user still sees something useful.
+/// A plain window built in code, with no XAML file and no NavigationView.
+/// Used only if the main window fails to load, so the user still sees every page.
 /// </summary>
 internal sealed class FallbackWindow : Window
 {
-    private readonly TextBlock _title = new() { FontSize = 18, TextWrapping = TextWrapping.Wrap };
-    private readonly TextBlock _message = new() { TextWrapping = TextWrapping.Wrap };
-    private readonly Button _retry = new() { Content = "Kiểm tra lại" };
-    private readonly StackPanel _disks = new() { Spacing = 12 };
-    private readonly SpaceView _space = new();
-    private readonly CleanupView _cleanup = new();
+    private readonly AppPages _pages = new();
+    private readonly ContentControl _host = new() { HorizontalContentAlignment = HorizontalAlignment.Stretch, MaxWidth = 960, Margin = new Thickness(24) };
+    private readonly ScrollViewer _scroller = new();
 
     public FallbackWindow()
     {
         Title = "Optimize Win";
-        _retry.Click += (_, _) => _ = CheckAsync();
 
-        var panel = new StackPanel { Margin = new Thickness(32), Spacing = 12, MaxWidth = 720 };
-        panel.Children.Add(new TextBlock { Text = "Optimize Win", FontSize = 28 });
-        panel.Children.Add(new TextBlock
+        var menu = new StackPanel { Spacing = 4, Margin = new Thickness(12), Width = 180 };
+        menu.Children.Add(new TextBlock
         {
-            Text = "Giao diện đầy đủ chưa tải được trên máy này nên đang dùng giao diện đơn giản. Lỗi đã được ghi lại để sửa.",
+            Text = "Giao diện đơn giản (giao diện đầy đủ chưa tải được, lỗi đã được ghi lại).",
             TextWrapping = TextWrapping.Wrap,
-            Opacity = 0.75,
+            Opacity = 0.7,
+            FontSize = 12,
+            Margin = new Thickness(0, 0, 0, 8),
         });
-        panel.Children.Add(_title);
-        panel.Children.Add(_message);
-        panel.Children.Add(_retry);
-        panel.Children.Add(new TextBlock { Text = "Ổ đĩa", FontSize = 18, Margin = new Thickness(0, 16, 0, 0) });
-        panel.Children.Add(_disks);
-        panel.Children.Add(new TextBlock { Text = "Dung lượng", FontSize = 18, Margin = new Thickness(0, 16, 0, 0) });
-        panel.Children.Add(_space.Root);
-        panel.Children.Add(new TextBlock { Text = "Khởi động cùng Windows", FontSize = 18, Margin = new Thickness(0, 16, 0, 0) });
-        panel.Children.Add(new StartupView().Root);
-        panel.Children.Add(new TextBlock { Text = "Dọn rác", FontSize = 18, Margin = new Thickness(0, 16, 0, 0) });
-        panel.Children.Add(_cleanup.CleanRoot);
-        panel.Children.Add(new TextBlock { Text = "Lịch sử dọn dẹp", FontSize = 18, Margin = new Thickness(0, 16, 0, 0) });
-        panel.Children.Add(_cleanup.HistoryRoot);
-        Content = new ScrollViewer { Content = panel };
+        foreach (var page in _pages.Pages)
+        {
+            var b = new Button { Content = page.Title, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left };
+            var key = page.Key;
+            b.Click += (_, _) => ShowPage(key);
+            menu.Children.Add(b);
+        }
 
-        AppWindow.Resize(new Windows.Graphics.SizeInt32(900, 640));
+        _scroller.Content = _host;
+        var root = new Grid();
+        root.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid.SetColumn(_scroller, 1);
+        root.Children.Add(menu);
+        root.Children.Add(_scroller);
+        Content = root;
+
+        _pages.NavigateRequested += ShowPage;
+        _pages.RetryRequested += () => _ = CheckAsync();
+        ShowPage("home");
+
+        AppWindow.Resize(new Windows.Graphics.SizeInt32(1100, 760));
         _ = CheckAsync();
+    }
+
+    private void ShowPage(string key)
+    {
+        _host.Content = _pages.Get(key).Content;
+        _scroller.ChangeView(null, 0, null, disableAnimation: true);
     }
 
     private async Task CheckAsync()
     {
-        _retry.IsEnabled = false;
-        Show(ServiceStatus.Checking);
-        Show(await ServiceStatus.QueryAsync());
-        _retry.IsEnabled = true;
-    }
-
-    private void Show(ServiceStatus status)
-    {
-        _title.Text = status.Title;
-        _title.Foreground = new SolidColorBrush(status.Level switch
-        {
-            StatusLevel.Success => Microsoft.UI.Colors.ForestGreen,
-            StatusLevel.Warning => Microsoft.UI.Colors.DarkOrange,
-            StatusLevel.Error => Microsoft.UI.Colors.Firebrick,
-            _ => Microsoft.UI.Colors.SteelBlue,
-        });
-        _message.Text = status.Message;
-        if (status.Batches is not null)
-        {
-            _cleanup.ShowHistory(status.Batches);
-        }
-        if (status.Level != StatusLevel.Info)
-        {
-            DiskCards.Fill(_disks, status.Disks);
-            _space.SetDrives(status.Disks);
-        }
+        _pages.Show(ServiceStatus.Checking);
+        _pages.Show(await ServiceStatus.QueryAsync());
     }
 }
