@@ -11,6 +11,7 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
         SpacePanel.Children.Add(_space.Root);
+        StartupPanel.Children.Add(new StartupView().Root);
         TryUseMica();
         AppWindow.Resize(new Windows.Graphics.SizeInt32(900, 640));
         _ = CheckServiceAsync();
