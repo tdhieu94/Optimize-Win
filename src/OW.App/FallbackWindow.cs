@@ -15,6 +15,7 @@ internal sealed class FallbackWindow : Window
     private readonly TextBlock _history = new() { TextWrapping = TextWrapping.Wrap };
     private readonly Button _retry = new() { Content = "Kiểm tra lại" };
     private readonly StackPanel _disks = new() { Spacing = 12 };
+    private readonly SpaceView _space = new();
 
     public FallbackWindow()
     {
@@ -34,6 +35,8 @@ internal sealed class FallbackWindow : Window
         panel.Children.Add(_retry);
         panel.Children.Add(new TextBlock { Text = "Ổ đĩa", FontSize = 18, Margin = new Thickness(0, 16, 0, 0) });
         panel.Children.Add(_disks);
+        panel.Children.Add(new TextBlock { Text = "Dung lượng", FontSize = 18, Margin = new Thickness(0, 16, 0, 0) });
+        panel.Children.Add(_space.Root);
         panel.Children.Add(new TextBlock { Text = "Lịch sử dọn dẹp", FontSize = 18, Margin = new Thickness(0, 16, 0, 0) });
         panel.Children.Add(_history);
         Content = new ScrollViewer { Content = panel };
@@ -65,6 +68,7 @@ internal sealed class FallbackWindow : Window
         if (status.Level != StatusLevel.Info)
         {
             DiskCards.Fill(_disks, status.Disks);
+            _space.SetDrives(status.Disks);
         }
     }
 }

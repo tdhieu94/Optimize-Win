@@ -15,7 +15,47 @@ public interface IOwService
 
     /// <summary>Read-only: physical disks, their health readings and the drives (C:, D:, ...) on each.</summary>
     Task<IReadOnlyList<DiskInfo>> GetDisksAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Read-only: starts measuring which folders use the most space on one local drive, in the background.
+    /// Takes only a drive letter ("C"), never a path. Returns false if another scan is still running.
+    /// </summary>
+    Task<bool> StartSpaceScanAsync(string driveLetter, CancellationToken cancellationToken = default);
+
+    /// <summary>Progress of the current (or last) space scan.</summary>
+    Task<SpaceScanStatus> GetSpaceScanStatusAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Result of the last finished space scan, or null if there is none.</summary>
+    Task<SpaceReport?> GetSpaceReportAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Stops the running space scan, if any.</summary>
+    Task CancelSpaceScanAsync(CancellationToken cancellationToken = default);
 }
+
+/// <param name="Error">Vietnamese message if the last scan failed or was stopped.</param>
+public sealed record SpaceScanStatus(
+    string? DriveLetter,
+    bool Running,
+    long Files,
+    long Bytes,
+    long Folders,
+    string CurrentFolder,
+    double Seconds,
+    bool HasReport,
+    string? Error);
+
+/// <summary>One folder or file in a space report. <see cref="Path"/> is null for an "other items" summary row.</summary>
+public sealed record SpaceItem(string Name, string? Path, bool IsFolder, long SizeBytes, long FileCount, IReadOnlyList<SpaceItem> Children);
+
+public sealed record SpaceReport(
+    string DriveLetter,
+    long DriveSizeBytes,
+    long DriveFreeBytes,
+    SpaceItem Root,
+    IReadOnlyList<SpaceItem> LargestFiles,
+    long FolderCount,
+    long InaccessibleFolders,
+    double Seconds);
 
 public static class OwPipe
 {

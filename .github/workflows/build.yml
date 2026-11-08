@@ -69,6 +69,13 @@ jobs:
           if ($hadCrash) { throw 'The main window reported an error (see crash.log above)' }
           Write-Host 'Main window is still running after 20 seconds with no errors'
 
+      - name: Space scan timing (read-only, C:\Windows, as SYSTEM-like admin)
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          & (Join-Path $env:ProgramFiles 'OptimizeWin\Service\OptimizeWin.Service.exe') --scan-timing 'C:\Windows'
+          if ($LASTEXITCODE -ne 0) { throw "Space scan timing failed with exit code $LASTEXITCODE" }
+
       - name: Smoke test - fallback window
         shell: pwsh
         run: |
