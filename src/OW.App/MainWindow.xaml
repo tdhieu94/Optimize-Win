@@ -8,7 +8,7 @@
         <StackPanel MaxWidth="720" Margin="32" Spacing="16">
             <TextBlock Text="Optimize Win" Style="{StaticResource TitleLargeTextBlockStyle}" />
             <TextBlock
-                Text="Bản nền tảng (giai đoạn 0). Chưa có chức năng dọn dẹp; bản này chỉ kiểm tra rằng ứng dụng nói chuyện được với dịch vụ OW một cách an toàn."
+                Text="Giai đoạn 1 (đang làm). Bản này chỉ đọc thông tin, chưa thay đổi gì trên máy."
                 TextWrapping="Wrap"
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
 
@@ -20,6 +20,11 @@
                 Title="Đang kiểm tra dịch vụ OW..." />
 
             <Button x:Name="RetryButton" Content="Kiểm tra lại" Click="OnRetryClick" />
+
+            <TextBlock Text="Ổ đĩa" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,16,0,0" />
+            <StackPanel x:Name="DisksPanel" Spacing="12">
+                <TextBlock Text="Đang đọc thông tin ổ đĩa..." Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
 
             <TextBlock Text="Lịch sử dọn dẹp" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,16,0,0" />
             <TextBlock

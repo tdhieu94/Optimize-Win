@@ -10,8 +10,8 @@ Kế hoạch chi tiết: [Kế hoạch thiết kế phần mềm Optimize Win](h
 
 | Giai đoạn | Nội dung | Trạng thái |
 | --- | --- | --- |
-| GĐ0 · Nền tảng | Lớp an toàn (nhật ký, cách ly, hoàn tác), dịch vụ admin, kênh giao tiếp, build tự động | Đang làm |
-| GĐ1 · MVP | Phân tích dung lượng, dọn rác cơ bản, quản lý khởi động, thông tin ổ và SMART | Chưa bắt đầu |
+| GĐ0 · Nền tảng | Lớp an toàn (nhật ký, cách ly, hoàn tác), dịch vụ admin, kênh giao tiếp, build tự động | Xong |
+| GĐ1 · MVP | Phân tích dung lượng, dọn rác cơ bản, quản lý khởi động, thông tin ổ và SMART | Đang làm: sức khỏe ổ đĩa |
 | GĐ2 · Mở rộng | File trùng, tối ưu dịch vụ, dọn thành phần Windows, lịch dọn | Chưa bắt đầu |
 | GĐ3 · Hoàn thiện | Gỡ ứng dụng, cảnh báo sức khỏe ổ, báo cáo | Chưa bắt đầu |
 | GĐ4 · Đóng gói | Bộ cài MSI, hướng dẫn có hình | Chưa bắt đầu |

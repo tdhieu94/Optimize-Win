@@ -14,6 +14,7 @@ internal sealed class FallbackWindow : Window
     private readonly TextBlock _message = new() { TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock _history = new() { TextWrapping = TextWrapping.Wrap };
     private readonly Button _retry = new() { Content = "Kiểm tra lại" };
+    private readonly StackPanel _disks = new() { Spacing = 12 };
 
     public FallbackWindow()
     {
@@ -31,6 +32,8 @@ internal sealed class FallbackWindow : Window
         panel.Children.Add(_title);
         panel.Children.Add(_message);
         panel.Children.Add(_retry);
+        panel.Children.Add(new TextBlock { Text = "Ổ đĩa", FontSize = 18, Margin = new Thickness(0, 16, 0, 0) });
+        panel.Children.Add(_disks);
         panel.Children.Add(new TextBlock { Text = "Lịch sử dọn dẹp", FontSize = 18, Margin = new Thickness(0, 16, 0, 0) });
         panel.Children.Add(_history);
         Content = new ScrollViewer { Content = panel };
@@ -59,5 +62,9 @@ internal sealed class FallbackWindow : Window
         });
         _message.Text = status.Message;
         _history.Text = string.IsNullOrEmpty(status.History) ? "Chưa có lần dọn nào." : status.History;
+        if (status.Level != StatusLevel.Info)
+        {
+            DiskCards.Fill(_disks, status.Disks);
+        }
     }
 }

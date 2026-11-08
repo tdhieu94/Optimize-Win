@@ -57,5 +57,10 @@ public sealed partial class MainWindow : Window
         {
             HistoryText.Text = status.History;
         }
+
+        if (status.Level != StatusLevel.Info)
+        {
+            DiskCards.Fill(DisksPanel, status.Disks);
+        }
     }
 }
