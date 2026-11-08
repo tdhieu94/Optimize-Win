@@ -40,8 +40,20 @@ public sealed class OwServiceImpl(SqliteJournal journal, SafeExecutor executor, 
     public Task<IReadOnlyList<DiskInfo>> GetDisksAsync(CancellationToken cancellationToken = default) =>
         Task.Run(DiskInspector.GetDisks, cancellationToken);
 
-    public Task<SpaceReport> AnalyzeSpaceAsync(string driveLetter, CancellationToken cancellationToken = default) =>
-        space.AnalyzeAsync(driveLetter, cancellationToken);
+    public Task<bool> StartSpaceScanAsync(string driveLetter, CancellationToken cancellationToken = default) =>
+        Task.FromResult(space.Start(driveLetter));
+
+    public Task<SpaceScanStatus> GetSpaceScanStatusAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(space.GetStatus());
+
+    public Task<SpaceReport?> GetSpaceReportAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(space.GetReport());
+
+    public Task CancelSpaceScanAsync(CancellationToken cancellationToken = default)
+    {
+        space.Cancel();
+        return Task.CompletedTask;
+    }
 
     public async Task<UndoSummary> UndoBatchAsync(Guid batchId, CancellationToken cancellationToken = default)
     {

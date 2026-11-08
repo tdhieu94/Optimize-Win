@@ -3,6 +3,23 @@ using OW.Core.Journal;
 using OW.Core.Safety;
 using OW.Service;
 
+if (args is ["--scan-timing", var timingPath])
+{
+    // Used by CI: how fast a read-only space scan runs on a real Windows folder.
+    var progress = new OW.Core.Space.SpaceScanProgress();
+    using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(8));
+    var task = Task.Run(() => OW.Core.Space.SpaceAnalyzer.Scan(timingPath, null, cts.Token, progress));
+    while (!task.Wait(TimeSpan.FromSeconds(10)))
+    {
+        Console.WriteLine($"  ... {progress.Files} files, {progress.Folders} folders, at {progress.CurrentFolder}");
+    }
+
+    var timed = task.Result;
+    var reportJson = System.Text.Json.JsonSerializer.Serialize(timed);
+    Console.WriteLine($"Scanned {timingPath}: {timed.Root.FileCount} files, {timed.FolderCount} folders, {timed.Root.SizeBytes / 1073741824.0:0.0} GB, {timed.InaccessibleFolders} not readable, {timed.SkippedLinks} links skipped, {timed.Duration.TotalSeconds:0.0}s, {reportJson.Length / 1024} KB of JSON");
+    return 0;
+}
+
 if (args.Contains("--self-test"))
 {
     // Used by CI: read-only checks that must work on a real Windows machine.

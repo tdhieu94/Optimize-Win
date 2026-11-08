@@ -145,6 +145,21 @@ public sealed class SpaceAnalyzerTests : IDisposable
     }
 
     [Fact]
+    public void Reports_progress_counters()
+    {
+        Make("a/b.bin", 50);
+        Make("c.bin", 25);
+        var progress = new SpaceScanProgress();
+
+        SpaceAnalyzer.Scan(_root, AlwaysExpand(), default, progress);
+
+        Assert.Equal(2, progress.Files);
+        Assert.Equal(75, progress.Bytes);
+        Assert.Equal(2, progress.Folders);
+        Assert.False(string.IsNullOrEmpty(progress.CurrentFolder));
+    }
+
+    [Fact]
     public void Can_be_cancelled()
     {
         Make("a/b.bin", 1);

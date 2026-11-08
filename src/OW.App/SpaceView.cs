@@ -19,6 +19,8 @@ internal sealed class SpaceView
 
     private readonly ComboBox _drives = new() { MinWidth = 120, PlaceholderText = "Chọn ổ" };
     private readonly Button _analyze = new() { Content = "Phân tích" };
+    private readonly Button _stop = new() { Content = "Dừng", Visibility = Visibility.Collapsed };
+    private bool _stopRequested;
     private readonly ProgressRing _busy = new() { IsActive = false, Width = 20, Height = 20, Visibility = Visibility.Collapsed };
     private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, Opacity = 0.75 };
     private readonly Button _up = new() { Content = "↑ Lên thư mục trên", Visibility = Visibility.Collapsed };
@@ -31,6 +33,11 @@ internal sealed class SpaceView
     public SpaceView()
     {
         _analyze.Click += (_, _) => _ = AnalyzeAsync();
+        _stop.Click += (_, _) =>
+        {
+            _stopRequested = true;
+            _stop.IsEnabled = false;
+        };
         _up.Click += (_, _) =>
         {
             if (_path.Count > 1)
@@ -43,6 +50,7 @@ internal sealed class SpaceView
         var bar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
         bar.Children.Add(_drives);
         bar.Children.Add(_analyze);
+        bar.Children.Add(_stop);
         bar.Children.Add(_busy);
 
         var nav = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
@@ -99,7 +107,7 @@ internal sealed class SpaceView
         }
 
         SetBusy(true);
-        _status.Text = $"Đang phân tích ổ {drive} ... Ổ đầy có thể mất vài phút, bạn cứ để cửa sổ mở.";
+        _status.Text = $"Đang bắt đầu phân tích ổ {drive} ... Ổ đầy có thể mất vài phút, bạn cứ để cửa sổ mở.";
         _rows.Children.Clear();
         _largest.Children.Clear();
         _largestTitle.Visibility = Visibility.Collapsed;
@@ -109,8 +117,40 @@ internal sealed class SpaceView
         try
         {
             await using var client = await OwServiceClient.ConnectAsync(TimeSpan.FromSeconds(3));
-            var report = await client.Service.AnalyzeSpaceAsync(drive[..1]);
-            Show(report);
+            if (!await client.Service.StartSpaceScanAsync(drive[..1]))
+            {
+                _status.Text = "Đang có một lần phân tích khác chạy. Đợi nó xong hoặc bấm Dừng rồi thử lại.";
+            }
+
+            while (true)
+            {
+                var st = await client.Service.GetSpaceScanStatusAsync();
+                if (_stopRequested)
+                {
+                    _stopRequested = false;
+                    await client.Service.CancelSpaceScanAsync();
+                }
+
+                if (!st.Running)
+                {
+                    var report = st.HasReport ? await client.Service.GetSpaceReportAsync() : null;
+                    if (report is not null)
+                    {
+                        Show(report);
+                    }
+                    else
+                    {
+                        _status.Text = st.Error ?? "Không có kết quả.";
+                    }
+
+                    break;
+                }
+
+                _status.Text = string.Create(
+                    Vi,
+                    $"Đang phân tích ổ {st.DriveLetter}: ... đã đếm {st.Files:N0} file ({Size(st.Bytes)}) trong {st.Folders:N0} thư mục, {st.Seconds:0} giây.\nĐang xem: {st.CurrentFolder}");
+                await Task.Delay(1000);
+            }
         }
         catch (TimeoutException)
         {
@@ -133,6 +173,9 @@ internal sealed class SpaceView
         _busy.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
         _analyze.IsEnabled = !busy;
         _drives.IsEnabled = !busy;
+        _stop.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
+        _stop.IsEnabled = busy;
+        _stopRequested = false;
     }
 
     private void Show(SpaceReport r)
