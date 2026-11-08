@@ -35,6 +35,25 @@ jobs:
           if (-not (Test-Path out/OptimizeWin/OptimizeWin.exe)) { throw 'OptimizeWin.exe missing' }
           if (-not (Test-Path out/OptimizeWin/Service/OptimizeWin.Service.exe)) { throw 'service exe missing' }
 
+      - name: Smoke test - app window stays open
+        shell: pwsh
+        run: |
+          $start = Get-Date
+          $p = Start-Process -FilePath out/OptimizeWin/OptimizeWin.exe -PassThru
+          Start-Sleep -Seconds 20
+          $p.Refresh()
+          $crash = Join-Path $env:LOCALAPPDATA 'OptimizeWin\crash.log'
+          if (Test-Path $crash) { Get-Content $crash }
+          if ($p.HasExited) {
+            Write-Host "App exited with code $($p.ExitCode)"
+            Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $start } -ErrorAction SilentlyContinue |
+              Where-Object { $_.ProviderName -in '.NET Runtime', 'Application Error', 'Windows Error Reporting' } |
+              Format-List TimeCreated, ProviderName, Id, Message
+            throw 'OptimizeWin.exe closed by itself during start-up'
+          }
+          Write-Host 'App is still running after 20 seconds'
+          Stop-Process -Id $p.Id -Force
+
       - uses: actions/upload-artifact@v4
         with:
           name: OptimizeWin-${{ github.sha }}

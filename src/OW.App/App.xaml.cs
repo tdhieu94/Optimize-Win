@@ -8,12 +8,29 @@ public partial class App : Application
 
     public App()
     {
-        InitializeComponent();
+        CrashReporter.Install(this);
+        try
+        {
+            InitializeComponent();
+        }
+        catch (Exception ex)
+        {
+            CrashReporter.Report(ex);
+            throw;
+        }
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
-        _window = new MainWindow();
-        _window.Activate();
+        try
+        {
+            _window = new MainWindow();
+            _window.Activate();
+        }
+        catch (Exception ex)
+        {
+            CrashReporter.Report(ex);
+            throw;
+        }
     }
 }
