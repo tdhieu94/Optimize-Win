@@ -19,12 +19,12 @@ public static class StartupReader
         var list = new List<StartupEntry>();
         var windowsDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
 
-        void Add(string name, string command, string? exe, StartupLocation location, bool enabled)
+        void Add(string name, string command, string? exe, StartupLocation location, bool enabled, string group, string approvalName)
         {
             var exists = exe is not null && SafeExists(exe);
             var publisher = exists ? Publisher(exe!) : null;
             var advice = StartupRules.Advise(name, exe, publisher, exists, windowsDir);
-            list.Add(new StartupEntry(name, command, exe, location, enabled, publisher, exists, advice));
+            list.Add(new StartupEntry(name, command, exe, location, enabled, publisher, exists, advice, group, approvalName));
         }
 
         ReadRun(RegistryHive.CurrentUser, RegistryView.Default, "Run", StartupLocation.UserRegistry, Add);
@@ -48,7 +48,7 @@ public static class StartupReader
             .ToList();
     }
 
-    private static void ReadRun(RegistryHive hive, RegistryView view, string approvedName, StartupLocation location, Action<string, string, string?, StartupLocation, bool> add)
+    private static void ReadRun(RegistryHive hive, RegistryView view, string approvedName, StartupLocation location, Action<string, string, string?, StartupLocation, bool, string, string> add)
     {
         try
         {
@@ -68,7 +68,7 @@ public static class StartupReader
                 }
 
                 var exe = StartupRules.ExtractExecutable(command, Environment.ExpandEnvironmentVariables);
-                add(name, command, exe, location, StartupRules.IsEnabled(approved?.GetValue(name) as byte[]));
+                add(name, command, exe, location, StartupRules.IsEnabled(approved?.GetValue(name) as byte[]), approvedName, name);
             }
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or IOException)
@@ -77,7 +77,7 @@ public static class StartupReader
         }
     }
 
-    private static void ReadFolder(string folder, RegistryHive hive, StartupLocation location, Action<string, string, string?, StartupLocation, bool> add)
+    private static void ReadFolder(string folder, RegistryHive hive, StartupLocation location, Action<string, string, string?, StartupLocation, bool, string, string> add)
     {
         if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
         {
@@ -95,7 +95,7 @@ public static class StartupReader
                     continue;
                 }
 
-                add(Path.GetFileNameWithoutExtension(file), file, file, location, StartupRules.IsEnabled(approved?.GetValue(fileName) as byte[]));
+                add(Path.GetFileNameWithoutExtension(file), file, file, location, StartupRules.IsEnabled(approved?.GetValue(fileName) as byte[]), "StartupFolder", fileName);
             }
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or IOException)

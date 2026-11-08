@@ -6,7 +6,7 @@ namespace OW.Service;
 /// What one connected UI sees. It knows which Windows account is on the other end of the pipe
 /// (read from the client's process, not claimed by the client), so per-user work uses that account.
 /// </summary>
-public sealed class OwClientSession(OwServiceImpl service, JunkService junk, UpdateService updates, DuplicateService duplicates, string? userSid) : IOwService
+public sealed class OwClientSession(OwServiceImpl service, JunkService junk, UpdateService updates, DuplicateService duplicates, StartupService startup, string? userSid) : IOwService
 {
     public Task<ServiceInfo> GetInfoAsync(CancellationToken cancellationToken = default) => service.GetInfoAsync(cancellationToken);
 
@@ -57,4 +57,7 @@ public sealed class OwClientSession(OwServiceImpl service, JunkService junk, Upd
 
     public Task<CleanSummary> RemoveDuplicatesAsync(Guid scanId, IReadOnlyList<string> paths, CancellationToken cancellationToken = default) =>
         Task.Run(() => duplicates.Remove(scanId, paths ?? []), cancellationToken);
+
+    public Task<StartupChangeResult> SetStartupEnabledAsync(StartupChangeRequest request, CancellationToken cancellationToken = default) =>
+        Task.Run(() => startup.SetEnabled(userSid, request), cancellationToken);
 }

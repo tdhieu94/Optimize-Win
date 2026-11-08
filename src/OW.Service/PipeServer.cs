@@ -10,7 +10,7 @@ namespace OW.Service;
 /// Listens on a local named pipe. Only SYSTEM, administrators and the logged-in user can connect,
 /// and each client must pass <see cref="ClientVerifier"/> before it can call anything.
 /// </summary>
-public sealed class PipeServer(OwServiceImpl service, JunkService junk, UpdateService updates, DuplicateService duplicates, ClientVerifier verifier, ILogger<PipeServer> logger) : BackgroundService
+public sealed class PipeServer(OwServiceImpl service, JunkService junk, UpdateService updates, DuplicateService duplicates, StartupService startup, ClientVerifier verifier, ILogger<PipeServer> logger) : BackgroundService
 {
     private const int MaxClients = 4;
     private readonly SemaphoreSlim _slots = new(MaxClients, MaxClients);
@@ -60,7 +60,7 @@ public sealed class PipeServer(OwServiceImpl service, JunkService junk, UpdateSe
             }
 
             using var rpc = new JsonRpc(new HeaderDelimitedMessageHandler(pipe, pipe, new SystemTextJsonFormatter()));
-            rpc.AddLocalRpcTarget<IOwService>(new OwClientSession(service, junk, updates, duplicates, ClientVerifier.GetClientUserSid(pipe)), null);
+            rpc.AddLocalRpcTarget<IOwService>(new OwClientSession(service, junk, updates, duplicates, startup, ClientVerifier.GetClientUserSid(pipe)), null);
             rpc.StartListening();
             using var reg = stoppingToken.Register(rpc.Dispose);
             await rpc.Completion.ConfigureAwait(false);

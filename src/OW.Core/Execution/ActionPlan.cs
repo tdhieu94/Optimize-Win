@@ -15,6 +15,9 @@ public abstract record PlannedAction;
 /// </summary>
 public sealed record QuarantineFileAction(string Path, long ExpectedSizeBytes, DateTime ExpectedLastWriteUtc) : PlannedAction;
 
+/// <summary>Turn a startup program on or off with Windows' own switch (nothing is deleted).</summary>
+public sealed record SetStartupApprovalAction(OW.Core.Startup.StartupApprovalTarget Target, bool Enable) : PlannedAction;
+
 public sealed record ExecutionResult(Guid BatchId, int Done, int Skipped, int Failed, long BytesFreed);
 
 public sealed record UndoResult(Guid BatchId, int Restored, int Failed, IReadOnlyList<string> Messages);

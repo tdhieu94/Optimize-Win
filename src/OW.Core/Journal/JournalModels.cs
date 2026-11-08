@@ -5,6 +5,9 @@ public enum OperationKind
 {
     /// <summary>A file was moved into quarantine (kept for a while so it can be restored).</summary>
     QuarantineFile,
+
+    /// <summary>A program's "start with Windows" switch was turned on or off. The previous value is kept so it can be put back.</summary>
+    SetStartupApproval,
 }
 
 public enum OperationState

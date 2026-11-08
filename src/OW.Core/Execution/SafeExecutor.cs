@@ -1,5 +1,6 @@
 using OW.Core.Journal;
 using OW.Core.Safety;
+using OW.Core.Startup;
 
 namespace OW.Core.Execution;
 
@@ -14,14 +15,16 @@ public sealed class SafeExecutor
     private readonly QuarantineStore _quarantine;
     private readonly PathGuard _guard;
     private readonly TimeProvider _time;
+    private readonly IStartupApprovalStore? _startup;
     private readonly Lock _runGate = new();
 
-    public SafeExecutor(SqliteJournal journal, QuarantineStore quarantine, PathGuard guard, TimeProvider? time = null)
+    public SafeExecutor(SqliteJournal journal, QuarantineStore quarantine, PathGuard guard, TimeProvider? time = null, IStartupApprovalStore? startup = null)
     {
         _journal = journal;
         _quarantine = quarantine;
         _guard = guard;
         _time = time ?? TimeProvider.System;
+        _startup = startup;
     }
 
     /// <summary>Carries out a plan. One bad file never stops the rest; each outcome is recorded.</summary>
@@ -44,8 +47,10 @@ public sealed class SafeExecutor
 
                 switch (plan.Actions[i])
                 {
-                    case QuarantineFileAction q:
-                        var outcome = QuarantineOne(batch.Id, i, q, plan.Origin);
+                    case QuarantineFileAction or SetStartupApprovalAction:
+                        var outcome = plan.Actions[i] is QuarantineFileAction q
+                            ? QuarantineOne(batch.Id, i, q, plan.Origin)
+                            : SetStartupOne(batch.Id, i, (SetStartupApprovalAction)plan.Actions[i]);
                         if (outcome.State == OperationState.Done)
                         {
                             done++;
@@ -90,6 +95,21 @@ public sealed class SafeExecutor
 
             foreach (var op in _journal.GetOperations(batchId).Where(o => o.State is OperationState.Done or OperationState.UndoFailed).OrderByDescending(o => o.Sequence))
             {
+                if (op.Kind == OperationKind.SetStartupApproval)
+                {
+                    if (UndoStartup(op) is { } problem)
+                    {
+                        messages.Add(problem);
+                        failed++;
+                    }
+                    else
+                    {
+                        restored++;
+                    }
+
+                    continue;
+                }
+
                 try
                 {
                     var landedAt = _quarantine.Restore(op.BackupPath!, op.TargetPath);
@@ -132,6 +152,15 @@ public sealed class SafeExecutor
             var settled = 0;
             foreach (var op in _journal.GetOperationsInState(OperationState.Pending))
             {
+                if (op.Kind == OperationKind.SetStartupApproval)
+                {
+                    // We cannot tell whether the switch was flipped: put back what was there before.
+                    var problem = UndoStartup(op);
+                    _journal.UpdateOperation(op.Id, OperationState.Failed, problem ?? "Bị gián đoạn; công tắc khởi động đã được trả lại như cũ.");
+                    settled++;
+                    continue;
+                }
+
                 var inQuarantine = op.BackupPath is not null && File.Exists(op.BackupPath);
                 var stillAtSource = File.Exists(op.TargetPath);
 
@@ -160,7 +189,7 @@ public sealed class SafeExecutor
             var purged = 0;
             foreach (var op in _journal.GetOperationsInState(OperationState.Done).Concat(_journal.GetOperationsInState(OperationState.UndoFailed)))
             {
-                if (op.UpdatedUtc > cutoff || op.BackupPath is null)
+                if (op.Kind != OperationKind.QuarantineFile || op.UpdatedUtc > cutoff || op.BackupPath is null)
                 {
                     continue;
                 }
@@ -178,6 +207,80 @@ public sealed class SafeExecutor
             }
 
             return purged;
+        }
+    }
+
+    private OperationRecord SetStartupOne(Guid batchId, int sequence, SetStartupApprovalAction action)
+    {
+        var target = action.Target;
+        if (_startup is null)
+        {
+            return _journal.AddOperation(batchId, sequence, OperationKind.SetStartupApproval, target.Encode(), null, 0, OperationState.Skipped, "Không đổi được công tắc khởi động ở đây.");
+        }
+
+        if (target.Validate() is { } invalid)
+        {
+            return _journal.AddOperation(batchId, sequence, OperationKind.SetStartupApproval, target.Encode(), null, 0, OperationState.Skipped, invalid);
+        }
+
+        byte[]? before;
+        try
+        {
+            before = _startup.Get(target);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            return _journal.AddOperation(batchId, sequence, OperationKind.SetStartupApproval, target.Encode(), null, 0, OperationState.Failed, ex.Message);
+        }
+
+        if (StartupRules.IsEnabled(before) == action.Enable)
+        {
+            return _journal.AddOperation(batchId, sequence, OperationKind.SetStartupApproval, target.Encode(), null, 0, OperationState.Skipped, action.Enable ? "Đã bật sẵn." : "Đã tắt sẵn.");
+        }
+
+        // Record first (with the old value, for undo), act second.
+        var op = _journal.AddOperation(batchId, sequence, OperationKind.SetStartupApproval, target.Encode(), StartupApprovalValues.ToText(before), 0, OperationState.Pending, action.Enable ? "Bật khởi động" : "Tắt khởi động");
+        try
+        {
+            _startup.Set(target, StartupApprovalValues.For(action.Enable, _time.GetUtcNow().UtcDateTime));
+            _journal.UpdateOperation(op.Id, OperationState.Done, op.Message);
+            return op with { State = OperationState.Done };
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            _journal.UpdateOperation(op.Id, OperationState.Failed, ex.Message);
+            return op with { State = OperationState.Failed };
+        }
+    }
+
+    /// <summary>Puts a startup switch back to the value it had before. Returns a message if that failed.</summary>
+    private string? UndoStartup(OperationRecord op)
+    {
+        var target = StartupApprovalTarget.Decode(op.TargetPath);
+        if (_startup is null || target is null)
+        {
+            _journal.UpdateOperation(op.Id, OperationState.UndoFailed, "Không đọc được công tắc khởi động cần trả lại.");
+            return $"Không hoàn tác được: {op.TargetPath}";
+        }
+
+        try
+        {
+            _startup.Set(target, StartupApprovalValues.FromText(op.BackupPath));
+            if (op.State != OperationState.Pending)
+            {
+                _journal.UpdateOperation(op.Id, OperationState.Undone);
+            }
+
+            return null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException or FormatException)
+        {
+            if (op.State != OperationState.Pending)
+            {
+                _journal.UpdateOperation(op.Id, OperationState.UndoFailed, ex.Message);
+            }
+
+            return $"Không hoàn tác được {target.ValueName}: {ex.Message}";
         }
     }
 
