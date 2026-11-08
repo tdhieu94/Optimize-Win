@@ -23,6 +23,7 @@ internal sealed class AppPages
     private readonly StartupView _startup = new();
     private readonly CleanupView _cleanup = new();
     private readonly DuplicatesView _duplicates = new();
+    private readonly WindowsCleanupView _windowsCleanup = new();
     private readonly StackPanel _disks = new() { Spacing = 12 };
     private readonly StackPanel _alerts = new() { Spacing = 8 };
     private readonly UpdateView _update = new();
@@ -60,7 +61,7 @@ internal sealed class AppPages
             new("disks", "Ổ đĩa", "", Page("Ổ đĩa", "Sức khỏe và dung lượng của từng ổ cứng, đọc từ Windows. Chỉ xem, không thay đổi gì.", _disks)),
             new("space", "Dung lượng", "", Page("Dung lượng", null, _space.Root)),
             new("startup", "Khởi động", "", Page("Khởi động cùng Windows", null, _startup.Root)),
-            new("clean", "Dọn rác", "", Page("Dọn rác", null, _cleanup.CleanRoot)),
+            new("clean", "Dọn rác", "", Page("Dọn rác", null, Stack(_cleanup.CleanRoot, _windowsCleanup.Root))),
             new("duplicates", "File trùng", "\uE8C8", Page("File trùng nhau", null, _duplicates.Root)),
             new("history", "Lịch sử", "", Page("Lịch sử dọn dẹp", "Mỗi lần dọn đều được ghi lại. Bấm \"Hoàn tác\" để lấy lại file trong vòng 7 ngày.", _cleanup.HistoryRoot)),
         ];
@@ -223,6 +224,17 @@ internal sealed class AppPages
             Opacity = 0.6,
             TextWrapping = TextWrapping.Wrap,
         });
+        return panel;
+    }
+
+    private static StackPanel Stack(params UIElement[] parts)
+    {
+        var panel = new StackPanel { Spacing = 8 };
+        foreach (var p in parts)
+        {
+            panel.Children.Add(p);
+        }
+
         return panel;
     }
 

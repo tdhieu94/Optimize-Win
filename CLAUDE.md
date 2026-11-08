@@ -10,6 +10,7 @@ Personal Windows 11 optimizer for one non-technical user (Hieu). UI text is Viet
 - The service only talks to `OptimizeWin.exe` installed one folder above it (ClientVerifier). Do not weaken this.
 - No telemetry, nothing about the machine leaves it. The only network call is the update check/download from this repo's GitHub releases (`UpdateRules`), HTTPS only, SHA-256 verified before install.
 - No registry cleaner, no partition resizing, no defrag on SSDs.
+- Windows' own files (WinSxS, Windows.old, restore points) are never deleted by OW. The only exception is Windows' own component cleanup: `dism.exe` with the fixed arguments in `ComponentStore` (never `/ResetBase`), run through SafeExecutor only when the user pressed the button and confirmed (`ActionOrigin.UserSelected`). It is journaled but cannot be undone, and the UI says so.
 - Any new rule or write operation needs tests in `tests/OW.Core.Tests` and must be tried in Windows Sandbox before Hieu runs it.
 
 ## Build

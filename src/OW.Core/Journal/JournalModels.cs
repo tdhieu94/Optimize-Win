@@ -8,6 +8,9 @@ public enum OperationKind
 
     /// <summary>A program's "start with Windows" switch was turned on or off. The previous value is kept so it can be put back.</summary>
     SetStartupApproval,
+
+    /// <summary>Windows' own component cleanup (DISM /StartComponentCleanup) ran. It removes superseded Windows files and cannot be undone.</summary>
+    RunComponentCleanup,
 }
 
 public enum OperationState

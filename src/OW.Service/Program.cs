@@ -20,6 +20,43 @@ if (args is ["--scan-timing", var timingPath])
     return 0;
 }
 
+if (args.Contains("--windows-analysis") || args.Contains("--component-cleanup-ci"))
+{
+    // Used by CI: read-only DISM analysis, then (only with --component-cleanup-ci, on the throw-away runner)
+    // the real component cleanup through SafeExecutor with a temporary journal.
+    var log = Microsoft.Extensions.Logging.Abstractions.NullLogger<WindowsCleanupService>.Instance;
+    var tmp = Path.Combine(Path.GetTempPath(), "ow-ci-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(tmp);
+    using var ciJournal = new SqliteJournal(Path.Combine(tmp, "journal.db"));
+    var dism = new DismRunner();
+    var ciExecutor = new SafeExecutor(ciJournal, new QuarantineStore(Path.Combine(tmp, "q")), PathGuard.CreateForCurrentMachine(),
+        componentCleaner: new DismComponentCleaner(dism, Microsoft.Extensions.Logging.Abstractions.NullLogger<DismComponentCleaner>.Instance));
+    var windows = new WindowsCleanupService(ciExecutor, ciJournal, dism, log);
+    var report = windows.Analyze();
+    Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(report, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+    if (report.ComponentStoreBytes is null)
+    {
+        Console.WriteLine("Component store size could not be read: " + report.ComponentStoreError);
+        return 1;
+    }
+
+    if (args.Contains("--component-cleanup-ci"))
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var result = ciExecutor.Execute(new ActionPlan("CI component cleanup", ActionOrigin.UserSelected, [new RunComponentCleanupAction()]));
+        var op = ciJournal.GetOperations(result.BatchId).Single();
+        Console.WriteLine($"Component cleanup: {op.State} in {clock.Elapsed.TotalMinutes:0.0} min, freed {result.BytesFreed / 1048576.0:0} MB: {op.Message}");
+        var undo = ciExecutor.UndoBatch(result.BatchId);
+        Console.WriteLine("Undo says: " + string.Join(" ", undo.Messages));
+        if (op.State != OW.Core.Journal.OperationState.Done || undo.Restored != 0)
+        {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 if (args.Contains("--self-test"))
 {
     // Used by CI: read-only checks that must work on a real Windows machine.
@@ -107,7 +144,11 @@ builder.Services.AddSingleton(sp => new SafeExecutor(
     sp.GetRequiredService<QuarantineStore>(),
     sp.GetRequiredService<PathGuard>(),
     sp.GetRequiredService<TimeProvider>(),
-    sp.GetRequiredService<OW.Core.Startup.IStartupApprovalStore>()));
+    sp.GetRequiredService<OW.Core.Startup.IStartupApprovalStore>(),
+    sp.GetRequiredService<OW.Core.WindowsCleanup.IComponentStoreCleaner>()));
+builder.Services.AddSingleton<DismRunner>();
+builder.Services.AddSingleton<OW.Core.WindowsCleanup.IComponentStoreCleaner, DismComponentCleaner>();
+builder.Services.AddSingleton<WindowsCleanupService>();
 builder.Services.AddSingleton<SpaceService>();
 builder.Services.AddSingleton<JunkService>();
 builder.Services.AddSingleton<DuplicateService>();

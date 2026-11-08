@@ -119,6 +119,13 @@ jobs:
           if (-not ($log -match 'Notification shown|opening the window')) { throw 'The test alert was neither notified nor shown in the window' }
           if (-not ($log[-1] -match ', 0 to announce')) { throw 'The second check announced the same alert again' }
 
+      - name: Windows component store - analysis and real cleanup (throw-away runner)
+        shell: pwsh
+        timeout-minutes: 40
+        run: |
+          & (Join-Path $env:ProgramFiles 'OptimizeWin\Service\OptimizeWin.Service.exe') --component-cleanup-ci
+          if ($LASTEXITCODE -ne 0) { throw "Component cleanup check failed with exit code $LASTEXITCODE" }
+
       - name: Space scan timing (read-only, C:\Windows, as SYSTEM-like admin)
         shell: pwsh
         timeout-minutes: 10

@@ -18,6 +18,12 @@ public sealed record QuarantineFileAction(string Path, long ExpectedSizeBytes, D
 /// <summary>Turn a startup program on or off with Windows' own switch (nothing is deleted).</summary>
 public sealed record SetStartupApprovalAction(OW.Core.Startup.StartupApprovalTarget Target, bool Enable) : PlannedAction;
 
+/// <summary>
+/// Ask Windows to remove superseded copies of its own components (DISM /StartComponentCleanup, without /ResetBase).
+/// Windows decides what to remove; OW never deletes files in WinSxS itself. Cannot be undone.
+/// </summary>
+public sealed record RunComponentCleanupAction : PlannedAction;
+
 public sealed record ExecutionResult(Guid BatchId, int Done, int Skipped, int Failed, long BytesFreed);
 
 public sealed record UndoResult(Guid BatchId, int Restored, int Failed, IReadOnlyList<string> Messages);
