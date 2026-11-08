@@ -4,10 +4,6 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="Optimize Win">
-    <Window.SystemBackdrop>
-        <MicaBackdrop />
-    </Window.SystemBackdrop>
-
     <ScrollViewer>
         <StackPanel MaxWidth="720" Margin="32" Spacing="16">
             <TextBlock Text="Optimize Win" Style="{StaticResource TitleLargeTextBlockStyle}" />

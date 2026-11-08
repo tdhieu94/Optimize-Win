@@ -11,8 +11,28 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        TryUseMica();
         AppWindow.Resize(new Windows.Graphics.SizeInt32(900, 640));
         _ = CheckServiceAsync();
+    }
+
+    /// <summary>
+    /// Mica (the translucent Windows 11 background) is not available everywhere, e.g. in Windows Sandbox,
+    /// where declaring it in XAML made the window fail to load. Use it only where Windows supports it.
+    /// </summary>
+    private void TryUseMica()
+    {
+        try
+        {
+            if (Microsoft.UI.Composition.SystemBackdrops.MicaController.IsSupported())
+            {
+                SystemBackdrop = new Microsoft.UI.Xaml.Media.MicaBackdrop();
+            }
+        }
+        catch (Exception ex)
+        {
+            CrashReporter.Write(ex);
+        }
     }
 
     private void OnRetryClick(object sender, RoutedEventArgs e) => _ = CheckServiceAsync();
