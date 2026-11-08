@@ -25,9 +25,16 @@ public sealed class JunkService(SafeExecutor executor, TimeProvider time, ILogge
 
         var local = Path.Combine(profile, "AppData", "Local");
         var now = time.GetUtcNow().UtcDateTime;
+        var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
         var categories = new List<JunkCategory>
         {
             JunkRules.UserTemp(Path.Combine(local, "Temp"), now),
+            JunkRules.BrowserCache(local, now),
+            JunkRules.WindowsUpdateDownloads(windows, now),
+            JunkRules.WindowsTemp(windows, now),
+            JunkRules.ShaderCache(local, now),
+            JunkRules.ErrorReports(local, programData, now),
             JunkRules.CrashDumps(Path.Combine(local, "CrashDumps"), now),
         };
 
