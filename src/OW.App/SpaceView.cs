@@ -194,6 +194,10 @@ internal sealed class SpaceView
         {
             text += $" Khoảng {Size(unseen)} không thấy trong thư mục nào (thường là file hệ thống như bộ nhớ ảo, ngủ đông, điểm khôi phục).";
         }
+        else if (r.Root.SizeBytes > used + (1024L * 1024 * 1024))
+        {
+            text += $"\nLưu ý: tổng đếm được ({Size(r.Root.SizeBytes)}) lớn hơn phần ổ đang dùng. Windows cho nhiều tên file cùng trỏ tới một dữ liệu (nhất là trong thư mục Windows), nên có file bị đếm nhiều lần. Trong Windows Sandbox, file hệ thống còn được mượn từ máy thật. Con số của từng thư mục vẫn đúng để so sánh thư mục nào lớn hơn.";
+        }
 
         _status.Text = text;
 
