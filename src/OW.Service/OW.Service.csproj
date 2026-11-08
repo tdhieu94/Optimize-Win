@@ -12,6 +12,7 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" />
     <PackageReference Include="StreamJsonRpc" />
+    <PackageReference Include="System.Management" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\OW.Core\OW.Core.csproj" />

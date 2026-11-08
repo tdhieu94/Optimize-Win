@@ -12,6 +12,9 @@ public interface IOwService
     Task<IReadOnlyList<BatchSummary>> GetHistoryAsync(int maxCount, CancellationToken cancellationToken = default);
 
     Task<UndoSummary> UndoBatchAsync(Guid batchId, CancellationToken cancellationToken = default);
+
+    /// <summary>Read-only: physical disks, their health readings and the drives (C:, D:, ...) on each.</summary>
+    Task<IReadOnlyList<DiskInfo>> GetDisksAsync(CancellationToken cancellationToken = default);
 }
 
 public static class OwPipe
@@ -34,3 +37,21 @@ public sealed record BatchSummary(
     long Bytes);
 
 public sealed record UndoSummary(Guid BatchId, int Restored, int Failed, IReadOnlyList<string> Messages);
+
+public sealed record DiskInfo(
+    int Number,
+    string Model,
+    string MediaType,
+    string BusType,
+    long SizeBytes,
+    string? WindowsHealthStatus,
+    int? TemperatureC,
+    int? WearPercentUsed,
+    long? PowerOnHours,
+    long? ReadErrorsUncorrected,
+    long? WriteErrorsUncorrected,
+    string Verdict,
+    IReadOnlyList<string> Reasons,
+    IReadOnlyList<VolumeInfo> Volumes);
+
+public sealed record VolumeInfo(string DriveLetter, string Label, string FileSystem, long SizeBytes, long FreeBytes);

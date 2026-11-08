@@ -37,6 +37,9 @@ public sealed class OwServiceImpl(SqliteJournal journal, SafeExecutor executor, 
         return Task.FromResult<IReadOnlyList<BatchSummary>>(list);
     }
 
+    public Task<IReadOnlyList<DiskInfo>> GetDisksAsync(CancellationToken cancellationToken = default) =>
+        Task.Run(DiskInspector.GetDisks, cancellationToken);
+
     public async Task<UndoSummary> UndoBatchAsync(Guid batchId, CancellationToken cancellationToken = default)
     {
         logger.LogInformation("Undo requested for batch {BatchId}", batchId);

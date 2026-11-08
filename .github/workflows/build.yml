@@ -45,6 +45,10 @@ jobs:
           Write-Host "Service status: $($svc.Status)"
           if ($svc.Status -ne 'Running') { throw 'OptimizeWinService is not running after install' }
 
+          Write-Host 'Service self-test (read-only disk check):'
+          & (Join-Path $env:ProgramFiles 'OptimizeWin\Service\OptimizeWin.Service.exe') --self-test
+          if ($LASTEXITCODE -ne 0) { throw "Service self-test failed with exit code $LASTEXITCODE" }
+
           $start = Get-Date
           $exe = Join-Path $env:ProgramFiles 'OptimizeWin\OptimizeWin.exe'
           $p = Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -PassThru
