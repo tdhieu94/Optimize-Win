@@ -31,7 +31,8 @@ public sealed class OwServiceImpl(SqliteJournal journal, SafeExecutor executor, 
                     ops.Count(o => o.State == OperationState.Skipped),
                     ops.Count(o => o.State is OperationState.Failed or OperationState.UndoFailed),
                     ops.Count(o => o.State == OperationState.Undone),
-                    ops.Where(o => o.State is OperationState.Done or OperationState.Purged).Sum(o => o.SizeBytes));
+                    ops.Where(o => o.State is OperationState.Done or OperationState.Purged).Sum(o => o.SizeBytes),
+                    ops.Any(o => o.Kind != OperationKind.RunComponentCleanup));
             })
             .ToList();
         return Task.FromResult<IReadOnlyList<BatchSummary>>(list);

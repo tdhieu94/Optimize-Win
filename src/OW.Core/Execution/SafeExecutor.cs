@@ -1,6 +1,7 @@
 using OW.Core.Journal;
 using OW.Core.Safety;
 using OW.Core.Startup;
+using OW.Core.WindowsCleanup;
 
 namespace OW.Core.Execution;
 
@@ -16,10 +17,14 @@ public sealed class SafeExecutor
     private readonly PathGuard _guard;
     private readonly TimeProvider _time;
     private readonly IStartupApprovalStore? _startup;
+    private readonly IComponentStoreCleaner? _componentCleaner;
     private readonly Lock _runGate = new();
 
-    public SafeExecutor(SqliteJournal journal, QuarantineStore quarantine, PathGuard guard, TimeProvider? time = null, IStartupApprovalStore? startup = null)
+    public const string ComponentCleanupTarget = "windows|component-store";
+
+    public SafeExecutor(SqliteJournal journal, QuarantineStore quarantine, PathGuard guard, TimeProvider? time = null, IStartupApprovalStore? startup = null, IComponentStoreCleaner? componentCleaner = null)
     {
+        _componentCleaner = componentCleaner;
         _journal = journal;
         _quarantine = quarantine;
         _guard = guard;
@@ -47,10 +52,13 @@ public sealed class SafeExecutor
 
                 switch (plan.Actions[i])
                 {
-                    case QuarantineFileAction or SetStartupApprovalAction:
-                        var outcome = plan.Actions[i] is QuarantineFileAction q
-                            ? QuarantineOne(batch.Id, i, q, plan.Origin)
-                            : SetStartupOne(batch.Id, i, (SetStartupApprovalAction)plan.Actions[i]);
+                    case QuarantineFileAction or SetStartupApprovalAction or RunComponentCleanupAction:
+                        var outcome = plan.Actions[i] switch
+                        {
+                            QuarantineFileAction q => QuarantineOne(batch.Id, i, q, plan.Origin),
+                            SetStartupApprovalAction s => SetStartupOne(batch.Id, i, s),
+                            _ => ComponentCleanupOne(batch.Id, i, plan.Origin, cancellationToken),
+                        };
                         if (outcome.State == OperationState.Done)
                         {
                             done++;
@@ -92,8 +100,19 @@ public sealed class SafeExecutor
 
             var messages = new List<string>();
             int restored = 0, failed = 0;
+            var operations = _journal.GetOperations(batchId);
 
-            foreach (var op in _journal.GetOperations(batchId).Where(o => o.State is OperationState.Done or OperationState.UndoFailed).OrderByDescending(o => o.Sequence))
+            if (operations.Any(o => o.Kind == OperationKind.RunComponentCleanup && o.State == OperationState.Done))
+            {
+                messages.Add("Dọn kho thành phần Windows không hoàn tác được: Windows đã xoá các bản cũ không còn dùng. Máy vẫn chạy bình thường và các bản cập nhật vẫn gỡ được.");
+            }
+
+            if (operations.All(o => o.Kind == OperationKind.RunComponentCleanup))
+            {
+                return new UndoResult(batchId, 0, 0, messages);
+            }
+
+            foreach (var op in operations.Where(o => o.Kind != OperationKind.RunComponentCleanup && o.State is OperationState.Done or OperationState.UndoFailed).OrderByDescending(o => o.Sequence))
             {
                 if (op.Kind == OperationKind.SetStartupApproval)
                 {
@@ -135,7 +154,7 @@ public sealed class SafeExecutor
                 messages.Add($"{op.TargetPath} đã quá hạn giữ trong vùng cách ly nên không khôi phục được.");
             }
 
-            var anyLeft = _journal.GetOperations(batchId).Any(o => o.State is OperationState.UndoFailed or OperationState.Purged);
+            var anyLeft = _journal.GetOperations(batchId).Any(o => o.State is OperationState.UndoFailed or OperationState.Purged || (o.Kind == OperationKind.RunComponentCleanup && o.State == OperationState.Done));
             _journal.SetBatchState(batchId, anyLeft ? BatchState.PartiallyUndone : BatchState.Undone);
             return new UndoResult(batchId, restored, failed, messages);
         }
@@ -152,6 +171,14 @@ public sealed class SafeExecutor
             var settled = 0;
             foreach (var op in _journal.GetOperationsInState(OperationState.Pending))
             {
+                if (op.Kind == OperationKind.RunComponentCleanup)
+                {
+                    // Windows' servicing stack finishes or rolls back its own work; nothing for OW to put back.
+                    _journal.UpdateOperation(op.Id, OperationState.Failed, "Bị gián đoạn (máy tắt hoặc dịch vụ khởi động lại). Windows tự xử lý phần dở dang; có thể chạy lại.");
+                    settled++;
+                    continue;
+                }
+
                 if (op.Kind == OperationKind.SetStartupApproval)
                 {
                     // We cannot tell whether the switch was flipped: put back what was there before.
@@ -208,6 +235,36 @@ public sealed class SafeExecutor
 
             return purged;
         }
+    }
+
+    private OperationRecord ComponentCleanupOne(Guid batchId, int sequence, ActionOrigin origin, CancellationToken cancellationToken)
+    {
+        if (_componentCleaner is null)
+        {
+            return _journal.AddOperation(batchId, sequence, OperationKind.RunComponentCleanup, ComponentCleanupTarget, null, 0, OperationState.Skipped, "Không chạy được dọn kho thành phần Windows ở đây.");
+        }
+
+        if (origin != ActionOrigin.UserSelected)
+        {
+            // Not undoable, so only when Hieu pressed the button and confirmed, never from a schedule or rule.
+            return _journal.AddOperation(batchId, sequence, OperationKind.RunComponentCleanup, ComponentCleanupTarget, null, 0, OperationState.Skipped, "Chỉ chạy khi người dùng tự bấm và xác nhận.");
+        }
+
+        var op = _journal.AddOperation(batchId, sequence, OperationKind.RunComponentCleanup, ComponentCleanupTarget, null, 0, OperationState.Pending, "Đang dọn kho thành phần Windows");
+        ComponentCleanupOutcome outcome;
+        try
+        {
+            outcome = _componentCleaner.Cleanup(cancellationToken);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception or OperationCanceledException)
+        {
+            _journal.UpdateOperation(op.Id, OperationState.Failed, ex.Message);
+            return op with { State = OperationState.Failed, Message = ex.Message };
+        }
+
+        var state = outcome.Success ? OperationState.Done : OperationState.Failed;
+        _journal.UpdateOperation(op.Id, state, outcome.Message);
+        return op with { State = state, SizeBytes = Math.Max(0, outcome.FreedBytes), Message = outcome.Message };
     }
 
     private OperationRecord SetStartupOne(Guid batchId, int sequence, SetStartupApprovalAction action)

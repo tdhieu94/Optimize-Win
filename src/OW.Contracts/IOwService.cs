@@ -80,7 +80,41 @@ public interface IOwService
     /// the change is journaled and can be undone. Windows' own entries cannot be turned off.
     /// </summary>
     Task<StartupChangeResult> SetStartupEnabledAsync(StartupChangeRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Read-only: in the background, asks Windows (DISM) how big its component store (WinSxS) is and what cleanup could do,
+    /// and measures Windows.old and restore points. Returns false if analysis or cleanup is already running.
+    /// </summary>
+    Task<bool> StartWindowsAnalysisAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Starts Windows' own component cleanup (DISM /StartComponentCleanup, never /ResetBase) in the background, through the
+    /// safe executor's journal. Cannot be undone; the UI asks for confirmation first. Returns false if something is already running.
+    /// </summary>
+    Task<bool> StartComponentCleanupAsync(CancellationToken cancellationToken = default);
+
+    Task<WindowsCleanupStatus> GetWindowsCleanupStatusAsync(CancellationToken cancellationToken = default);
 }
+
+/// <param name="ComponentStoreBytes">Real size of WinSxS (much is shared with Windows itself).</param>
+/// <param name="CleanableBytes">Backups and cache inside it: the most cleanup could remove; usually it removes less.</param>
+/// <param name="WindowsOldBytes">Size of C:\Windows.old, or null if there is none.</param>
+public sealed record WindowsCleanupReport(
+    DateTimeOffset MeasuredUtc,
+    long? ComponentStoreBytes,
+    long? CleanableBytes,
+    int? ReclaimablePackages,
+    bool? CleanupRecommended,
+    string? LastCleanup,
+    string? ComponentStoreError,
+    long? WindowsOldBytes,
+    int RestorePointCount,
+    long? RestorePointBytes,
+    long SystemDriveFreeBytes);
+
+/// <param name="Percent">DISM's own progress, when it reports one.</param>
+/// <param name="LastResult">Vietnamese outcome of the last cleanup (or analysis error).</param>
+public sealed record WindowsCleanupStatus(bool Running, string Stage, double? Percent, double Seconds, WindowsCleanupReport? Report, string? LastResult, bool LastResultOk);
 
 /// <param name="MachineWide">True for entries of every user (HKLM Run or the all-users Startup folder).</param>
 /// <param name="Group">"Run", "Run32" or "StartupFolder".</param>
@@ -157,7 +191,8 @@ public sealed record BatchSummary(
     int Skipped,
     int Failed,
     int Undone,
-    long Bytes);
+    long Bytes,
+    bool CanUndo = true);
 
 public sealed record UndoSummary(Guid BatchId, int Restored, int Failed, IReadOnlyList<string> Messages);
 

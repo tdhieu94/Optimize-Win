@@ -97,7 +97,7 @@ internal sealed class CleanupView
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.Children.Add(text);
 
-        if (b.State is "Completed" or "CompletedWithProblems" or "PartiallyUndone" && b.Done > b.Undone)
+        if (b.CanUndo && b.State is "Completed" or "CompletedWithProblems" or "PartiallyUndone" && b.Done > b.Undone)
         {
             var undo = new Button { Content = "Hoàn tác", VerticalAlignment = VerticalAlignment.Center };
             undo.Click += (_, _) => _ = UndoAsync(b, undo);
