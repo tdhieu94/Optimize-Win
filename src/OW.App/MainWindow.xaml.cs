@@ -6,12 +6,15 @@ namespace OW.App;
 public sealed partial class MainWindow : Window
 {
     private readonly SpaceView _space = new();
+    private readonly CleanupView _cleanup = new();
 
     public MainWindow()
     {
         InitializeComponent();
         SpacePanel.Children.Add(_space.Root);
         StartupPanel.Children.Add(new StartupView().Root);
+        CleanPanel.Children.Add(_cleanup.CleanRoot);
+        HistoryPanel.Children.Add(_cleanup.HistoryRoot);
         TryUseMica();
         AppWindow.Resize(new Windows.Graphics.SizeInt32(900, 640));
         _ = CheckServiceAsync();
@@ -57,9 +60,9 @@ public sealed partial class MainWindow : Window
         };
         StatusBar.Title = status.Title;
         StatusBar.Message = status.Message;
-        if (!string.IsNullOrEmpty(status.History))
+        if (status.Batches is not null)
         {
-            HistoryText.Text = status.History;
+            _cleanup.ShowHistory(status.Batches);
         }
 
         if (status.Level != StatusLevel.Info)

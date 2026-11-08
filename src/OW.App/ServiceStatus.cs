@@ -13,7 +13,7 @@ internal enum StatusLevel
     Error,
 }
 
-internal sealed record ServiceStatus(StatusLevel Level, string Title, string Message, string History, IReadOnlyList<DiskInfo> Disks)
+internal sealed record ServiceStatus(StatusLevel Level, string Title, string Message, string History, IReadOnlyList<DiskInfo> Disks, IReadOnlyList<BatchSummary>? Batches = null)
 {
     public static ServiceStatus Checking { get; } = new(StatusLevel.Info, "Đang kiểm tra dịch vụ OW...", string.Empty, string.Empty, []);
 
@@ -54,7 +54,8 @@ internal sealed record ServiceStatus(StatusLevel Level, string Title, string Mes
                 "Dịch vụ OW đang chạy",
                 $"Phiên bản {info.Version}. File bị dọn sẽ được giữ {info.QuarantineRetentionDays} ngày để bạn khôi phục nếu cần.",
                 text,
-                disks);
+                disks,
+                history);
         }
         catch (TimeoutException)
         {

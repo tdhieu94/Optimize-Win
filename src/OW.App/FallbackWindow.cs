@@ -12,10 +12,10 @@ internal sealed class FallbackWindow : Window
 {
     private readonly TextBlock _title = new() { FontSize = 18, TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock _message = new() { TextWrapping = TextWrapping.Wrap };
-    private readonly TextBlock _history = new() { TextWrapping = TextWrapping.Wrap };
     private readonly Button _retry = new() { Content = "Kiểm tra lại" };
     private readonly StackPanel _disks = new() { Spacing = 12 };
     private readonly SpaceView _space = new();
+    private readonly CleanupView _cleanup = new();
 
     public FallbackWindow()
     {
@@ -39,8 +39,10 @@ internal sealed class FallbackWindow : Window
         panel.Children.Add(_space.Root);
         panel.Children.Add(new TextBlock { Text = "Khởi động cùng Windows", FontSize = 18, Margin = new Thickness(0, 16, 0, 0) });
         panel.Children.Add(new StartupView().Root);
+        panel.Children.Add(new TextBlock { Text = "Dọn rác", FontSize = 18, Margin = new Thickness(0, 16, 0, 0) });
+        panel.Children.Add(_cleanup.CleanRoot);
         panel.Children.Add(new TextBlock { Text = "Lịch sử dọn dẹp", FontSize = 18, Margin = new Thickness(0, 16, 0, 0) });
-        panel.Children.Add(_history);
+        panel.Children.Add(_cleanup.HistoryRoot);
         Content = new ScrollViewer { Content = panel };
 
         AppWindow.Resize(new Windows.Graphics.SizeInt32(900, 640));
@@ -66,7 +68,10 @@ internal sealed class FallbackWindow : Window
             _ => Microsoft.UI.Colors.SteelBlue,
         });
         _message.Text = status.Message;
-        _history.Text = string.IsNullOrEmpty(status.History) ? "Chưa có lần dọn nào." : status.History;
+        if (status.Batches is not null)
+        {
+            _cleanup.ShowHistory(status.Batches);
+        }
         if (status.Level != StatusLevel.Info)
         {
             DiskCards.Fill(_disks, status.Disks);

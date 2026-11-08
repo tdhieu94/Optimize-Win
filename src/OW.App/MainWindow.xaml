@@ -8,7 +8,7 @@
         <StackPanel MaxWidth="720" Margin="32" Spacing="16">
             <TextBlock Text="Optimize Win" Style="{StaticResource TitleLargeTextBlockStyle}" />
             <TextBlock
-                Text="Giai đoạn 1 (đang làm). Bản này chỉ đọc thông tin, chưa thay đổi gì trên máy."
+                Text="Giai đoạn 1 (đang làm). Mọi thao tác dọn đều có thể hoàn tác trong 7 ngày."
                 TextWrapping="Wrap"
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
 
@@ -32,12 +32,11 @@
             <TextBlock Text="Khởi động cùng Windows" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,16,0,0" />
             <StackPanel x:Name="StartupPanel" />
 
+            <TextBlock Text="Dọn rác" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,16,0,0" />
+            <StackPanel x:Name="CleanPanel" />
+
             <TextBlock Text="Lịch sử dọn dẹp" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,16,0,0" />
-            <TextBlock
-                x:Name="HistoryText"
-                Text="Chưa có lần dọn nào."
-                TextWrapping="Wrap"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <StackPanel x:Name="HistoryPanel" />
         </StackPanel>
     </ScrollViewer>
 </Window>
