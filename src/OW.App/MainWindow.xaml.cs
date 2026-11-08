@@ -54,6 +54,8 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    public void ShowHome() => Select("home");
+
     private void Select(string key)
     {
         var item = Nav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => (string)i.Tag == key);

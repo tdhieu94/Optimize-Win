@@ -88,6 +88,31 @@ jobs:
           if ($hadCrash) { throw 'The main window reported an error (see crash.log above)' }
           Write-Host 'Main window is still running after 20 seconds with no errors'
 
+      - name: Smoke test - background check (scheduled task, notification, no repeat)
+        shell: pwsh
+        run: |
+          $task = Get-ScheduledTask -TaskName 'OptimizeWin Health Check' -ErrorAction SilentlyContinue
+          if (-not $task) { throw 'Scheduled task "OptimizeWin Health Check" was not registered' }
+          Write-Host "Task: $($task.Actions[0].Execute) $($task.Actions[0].Arguments); triggers: $($task.Triggers.Count)"
+          $dir = Join-Path $env:LOCALAPPDATA 'OptimizeWin'
+          Remove-Item (Join-Path $dir 'crash.log'), (Join-Path $dir 'check.log'), (Join-Path $dir 'alerts.json') -ErrorAction SilentlyContinue
+          $exe = Join-Path $env:ProgramFiles 'OptimizeWin\OptimizeWin.exe'
+          $env:OW_TEST_ALERT = '1'
+          foreach ($run in 1, 2) {
+            $p = Start-Process -FilePath $exe -ArgumentList '--check' -WorkingDirectory (Split-Path $exe) -PassThru
+            if (-not $p.WaitForExit(60000)) {
+              Get-Content (Join-Path $dir 'check.log') -ErrorAction SilentlyContinue
+              Stop-Process -Id $p.Id -Force
+              throw "--check run $run did not finish within 60 seconds"
+            }
+            Write-Host "--check run $run exited with code $($p.ExitCode)"
+          }
+          $log = Get-Content (Join-Path $dir 'check.log')
+          $log
+          if (Test-Path (Join-Path $dir 'crash.log')) { Get-Content (Join-Path $dir 'crash.log'); throw '--check reported an error' }
+          if (-not ($log -match 'Notification shown')) { throw 'The test alert was not shown as a notification' }
+          if (-not ($log[-1] -match ', 0 to announce')) { throw 'The second check announced the same alert again' }
+
       - name: Space scan timing (read-only, C:\Windows, as SYSTEM-like admin)
         shell: pwsh
         timeout-minutes: 10
