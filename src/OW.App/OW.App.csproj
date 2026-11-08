@@ -11,6 +11,9 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <UseWinUI>true</UseWinUI>
     <WindowsPackageType>None</WindowsPackageType>
+    <!-- Needed even when unpackaged: it generates resources.pri, without which the app cannot
+         find its own XAML pages (ms-appx:///MainWindow.xaml) at run time. -->
+    <EnableMsixTooling>true</EnableMsixTooling>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <SelfContained>true</SelfContained>
     <!-- Generated XAML code can raise warnings we do not control. -->
