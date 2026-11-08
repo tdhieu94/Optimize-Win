@@ -187,7 +187,7 @@ internal sealed class CleanupView
             Content = string.Create(
                 Vi,
                 $"{chosen.Sum(c => c.FileCount):N0} file ({Size(chosen.Sum(c => c.Bytes))}) sẽ được chuyển vào vùng cách ly.\n\nTrong 7 ngày bạn có thể bấm \"Hoàn tác\" ở phần Lịch sử để lấy lại toàn bộ."),
-            PrimaryButton = ContentDialogButton.Primary,
+            DefaultButton = ContentDialogButton.Close,
             PrimaryButtonText = "Dọn",
             CloseButtonText = "Thôi",
         };
