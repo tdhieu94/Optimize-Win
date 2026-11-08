@@ -11,7 +11,11 @@ public sealed class ServicePaths
         DataDirectory = dataDirectory;
         JournalFile = Path.Combine(dataDirectory, "journal.db");
         QuarantineDirectory = Path.Combine(dataDirectory, "Quarantine");
+        UpdatesDirectory = Path.Combine(dataDirectory, "Updates");
     }
+
+    /// <summary>Downloaded updates and the backup of the previous version (locked down like the rest).</summary>
+    public string UpdatesDirectory { get; }
 
     public string DataDirectory { get; }
 
@@ -24,6 +28,7 @@ public sealed class ServicePaths
         var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "OptimizeWin");
         CreateLockedDown(dir);
         CreateLockedDown(Path.Combine(dir, "Quarantine"));
+        CreateLockedDown(Path.Combine(dir, "Updates"));
         return new ServicePaths(dir);
     }
 

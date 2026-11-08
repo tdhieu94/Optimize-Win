@@ -6,7 +6,7 @@ namespace OW.Service;
 /// What one connected UI sees. It knows which Windows account is on the other end of the pipe
 /// (read from the client's process, not claimed by the client), so per-user work uses that account.
 /// </summary>
-public sealed class OwClientSession(OwServiceImpl service, JunkService junk, string? userSid) : IOwService
+public sealed class OwClientSession(OwServiceImpl service, JunkService junk, UpdateService updates, string? userSid) : IOwService
 {
     public Task<ServiceInfo> GetInfoAsync(CancellationToken cancellationToken = default) => service.GetInfoAsync(cancellationToken);
 
@@ -34,4 +34,9 @@ public sealed class OwClientSession(OwServiceImpl service, JunkService junk, str
 
     public Task<CleanSummary> CleanJunkAsync(Guid scanId, IReadOnlyList<string> categoryIds, CancellationToken cancellationToken = default) =>
         Task.Run(() => junk.Clean(userSid, scanId, categoryIds ?? []), cancellationToken);
+
+    public Task<UpdateInfo> CheckForUpdateAsync(CancellationToken cancellationToken = default) => updates.CheckAsync(cancellationToken);
+
+    public Task<UpdateStartResult> InstallUpdateAsync(string version, CancellationToken cancellationToken = default) =>
+        updates.InstallAsync(version, cancellationToken);
 }

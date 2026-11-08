@@ -9,9 +9,15 @@ on:
 permissions:
   contents: read
 
+env:
+  # Every build gets its own version; builds of main are published as releases for the in-app updater.
+  OW_VERSION: 0.5.${{ github.run_number }}
+
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -23,15 +29,15 @@ jobs:
         run: dotnet test tests/OW.Core.Tests/OW.Core.Tests.csproj -c Release
 
       - name: Publish service
-        run: dotnet publish src/OW.Service/OW.Service.csproj -c Release -r win-x64 --self-contained -o out/OptimizeWin/Service
+        run: dotnet publish src/OW.Service/OW.Service.csproj -c Release -r win-x64 --self-contained -p:Version=${{ env.OW_VERSION }} -o out/OptimizeWin/Service
 
       - name: Publish app
-        run: dotnet publish src/OW.App/OW.App.csproj -c Release -r win-x64 --self-contained -p:Platform=x64 -o out/OptimizeWin
+        run: dotnet publish src/OW.App/OW.App.csproj -c Release -r win-x64 --self-contained -p:Platform=x64 -p:Version=${{ env.OW_VERSION }} -o out/OptimizeWin
 
       - name: Add install scripts
         shell: pwsh
         run: |
-          Copy-Item scripts/install.ps1, scripts/uninstall.ps1, scripts/Cai-dat.cmd, scripts/Go-cai-dat.cmd out/OptimizeWin/
+          Copy-Item scripts/install.ps1, scripts/uninstall.ps1, scripts/update.ps1, scripts/Cai-dat.cmd, scripts/Go-cai-dat.cmd out/OptimizeWin/
           if (-not (Test-Path out/OptimizeWin/OptimizeWin.exe)) { throw 'OptimizeWin.exe missing' }
           Get-ChildItem out/OptimizeWin -Filter *.pri | Format-Table Name, Length
           if (-not (Get-ChildItem out/OptimizeWin -Filter *.pri)) { throw 'No .pri resource file in the app output; XAML pages would not load' }
@@ -41,6 +47,9 @@ jobs:
         shell: pwsh
         run: |
           & out/OptimizeWin/install.ps1 -Quiet
+          $installed = Get-Content (Join-Path $env:ProgramFiles 'OptimizeWin\installed.txt')
+          Write-Host "Installed version: $installed"
+          if ($installed -ne $env:OW_VERSION) { throw "installed.txt says '$installed', expected $env:OW_VERSION" }
           $svc = Get-Service OptimizeWinService
           Write-Host "Service status: $($svc.Status)"
           if ($svc.Status -ne 'Running') { throw 'OptimizeWinService is not running after install' }
@@ -64,6 +73,16 @@ jobs:
               Format-List TimeCreated, ProviderName, Id, Message
             throw 'OptimizeWin.exe closed by itself during start-up'
           }
+          # Screenshot for reviewing the UI (best effort; never fails the build).
+          try {
+            Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+            $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+            [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+            New-Item -ItemType Directory -Force out/screenshots | Out-Null
+            $bmp.Save("out/screenshots/main-window.png")
+            Write-Host "Saved screenshot $($b.Width)x$($b.Height)"
+          } catch { Write-Host "Screenshot skipped: $_" }
           Stop-Process -Id $p.Id -Force
           # An error dialog keeps the process alive, so a crash log also counts as a failure.
           if ($hadCrash) { throw 'The main window reported an error (see crash.log above)' }
@@ -75,6 +94,17 @@ jobs:
         run: |
           & (Join-Path $env:ProgramFiles 'OptimizeWin\Service\OptimizeWin.Service.exe') --scan-timing 'C:\Windows'
           if ($LASTEXITCODE -ne 0) { throw "Space scan timing failed with exit code $LASTEXITCODE" }
+
+      - name: Smoke test - updater script (backup, reinstall, service back up)
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'ow-update.log'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File out/OptimizeWin/update.ps1 -Backup (Join-Path $env:RUNNER_TEMP 'ow-backup') -Log $log -Version $env:OW_VERSION
+          Get-Content $log
+          if ($LASTEXITCODE -ne 0) { throw "update.ps1 exited with $LASTEXITCODE" }
+          if (-not (Select-String -Path $log -Pattern 'Cập nhật xong' -Quiet)) { throw 'update.ps1 did not finish' }
+          if ((Get-Service OptimizeWinService).Status -ne 'Running') { throw 'Service not running after update.ps1' }
+          if (-not (Test-Path (Join-Path $env:RUNNER_TEMP 'ow-backup\Service\OptimizeWin.Service.exe'))) { throw 'No backup made' }
 
       - name: Smoke test - fallback window
         shell: pwsh
@@ -91,8 +121,30 @@ jobs:
           Write-Host 'Fallback window is still running after 20 seconds'
           Stop-Process -Id $p.Id -Force
 
+      - name: Publish release for the in-app updater (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $zip = "OptimizeWin-$env:OW_VERSION.zip"
+          Compress-Archive -Path out/OptimizeWin/* -DestinationPath $zip
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -Path "$zip.sha256" -Value "$hash  $zip" -Encoding ASCII -NoNewline
+          $notes = git log -1 --format=%B
+          gh release create "v$env:OW_VERSION" $zip "$zip.sha256" --title "Optimize Win $env:OW_VERSION" --notes "$notes" --target $env:GITHUB_SHA
+          Write-Host "Released v$env:OW_VERSION ($hash)"
+
       - uses: actions/upload-artifact@v4
         with:
           name: OptimizeWin-${{ github.sha }}
           path: out/OptimizeWin
           retention-days: 30
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots-${{ github.sha }}
+          path: out/screenshots
+          if-no-files-found: ignore
+          retention-days: 7
