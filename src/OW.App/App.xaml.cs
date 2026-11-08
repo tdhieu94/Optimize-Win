@@ -9,6 +9,7 @@ public partial class App : Application
     public App()
     {
         CrashReporter.Install(this);
+        DebugSettings.XamlResourceReferenceFailed += (_, e) => CrashReporter.WriteText("XamlResourceReferenceFailed: " + e.Message);
         try
         {
             InitializeComponent();
@@ -24,13 +25,21 @@ public partial class App : Application
     {
         try
         {
+            if (Environment.GetEnvironmentVariable("OW_TEST_FALLBACK") == "1")
+            {
+                throw new InvalidOperationException("OW_TEST_FALLBACK is set (used by CI to test the fallback window).");
+            }
+
             _window = new MainWindow();
-            _window.Activate();
         }
         catch (Exception ex)
         {
-            CrashReporter.Report(ex);
-            throw;
+            // Keep the app usable: log everything we can learn, then show the simple window instead.
+            CrashReporter.Write(ex);
+            CrashReporter.WriteText(XamlDiagnostics.Probe());
+            _window = new FallbackWindow();
         }
+
+        _window.Activate();
     }
 }

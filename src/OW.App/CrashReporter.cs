@@ -34,10 +34,25 @@ internal static class CrashReporter
 
     public static void Write(Exception? ex)
     {
+        var text = $"{ex}";
+        if (ex is not null)
+        {
+            text += $"\n  HResult: 0x{ex.HResult:X8}";
+            foreach (System.Collections.DictionaryEntry entry in ex.Data)
+            {
+                text += $"\n  Data[{entry.Key}]: {entry.Value}";
+            }
+        }
+
+        WriteText(text);
+    }
+
+    public static void WriteText(string text)
+    {
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(LogPath)!);
-            File.AppendAllText(LogPath, $"[{DateTimeOffset.Now:O}] {ex}\n\n");
+            File.AppendAllText(LogPath, $"[{DateTimeOffset.Now:O}] {text}\n\n");
         }
         catch (IOException)
         {

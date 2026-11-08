@@ -60,6 +60,20 @@ jobs:
           Write-Host 'App is still running after 20 seconds'
           Stop-Process -Id $p.Id -Force
 
+      - name: Smoke test - fallback window
+        shell: pwsh
+        run: |
+          $env:OW_TEST_FALLBACK = '1'
+          $exe = Join-Path $env:ProgramFiles 'OptimizeWin\OptimizeWin.exe'
+          $p = Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -PassThru
+          Start-Sleep -Seconds 20
+          $p.Refresh()
+          $crash = Join-Path $env:LOCALAPPDATA 'OptimizeWin\crash.log'
+          if (Test-Path $crash) { Get-Content $crash }
+          if ($p.HasExited) { throw "Fallback window closed by itself (exit code $($p.ExitCode))" }
+          Write-Host 'Fallback window is still running after 20 seconds'
+          Stop-Process -Id $p.Id -Force
+
       - uses: actions/upload-artifact@v4
         with:
           name: OptimizeWin-${{ github.sha }}
