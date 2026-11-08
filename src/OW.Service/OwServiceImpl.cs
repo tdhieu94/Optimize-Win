@@ -5,8 +5,8 @@ using OW.Core.Journal;
 
 namespace OW.Service;
 
-/// <summary>The service side of <see cref="IOwService"/>. Every write goes through <see cref="SafeExecutor"/>.</summary>
-public sealed class OwServiceImpl(SqliteJournal journal, SafeExecutor executor, SpaceService space, ILogger<OwServiceImpl> logger) : IOwService
+/// <summary>Shared service logic behind <see cref="IOwService"/> (see <see cref="OwClientSession"/>). Every write goes through <see cref="SafeExecutor"/>.</summary>
+public sealed class OwServiceImpl(SqliteJournal journal, SafeExecutor executor, SpaceService space, ILogger<OwServiceImpl> logger)
 {
     private static readonly DateTimeOffset Started = DateTimeOffset.UtcNow;
 

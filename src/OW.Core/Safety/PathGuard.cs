@@ -38,6 +38,9 @@ public readonly record struct PathCheck(bool Allowed, string? Reason)
 /// </remarks>
 public sealed class PathGuard
 {
+    private static readonly string[] PersonalFolderNames =
+        ["Documents", "Desktop", "Pictures", "Videos", "Music", "Downloads", "OneDrive", "Favorites", "Contacts", "Saved Games"];
+
     private readonly PathStyle _style;
     private readonly char _sep;
     private readonly StringComparison _cmp;
@@ -84,9 +87,29 @@ public sealed class PathGuard
             Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
             Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),
             Environment.GetFolderPath(Environment.SpecialFolder.MyMusic),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "OneDrive"),
         };
+
+        // The service runs as SYSTEM, whose own "Documents" is not Hieu's. Protect the personal folders
+        // of every profile on the machine, not just of the account running this code.
+        var profiles = new List<string> { Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) };
+        try
+        {
+            var usersRoot = Path.GetDirectoryName(Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory)) is { } publicDir
+                ? Path.GetDirectoryName(publicDir)
+                : null;
+            if (usersRoot is not null && Directory.Exists(usersRoot))
+            {
+                profiles.AddRange(Directory.GetDirectories(usersRoot));
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+
+        foreach (var profile in profiles.Where(p => !string.IsNullOrEmpty(p)))
+        {
+            user.AddRange(PersonalFolderNames.Select(name => Path.Combine(profile, name)));
+        }
 
         return new PathGuard(PathStyle.Windows, system, user);
     }

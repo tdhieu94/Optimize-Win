@@ -33,6 +33,43 @@ public sealed class ClientVerifier(ILogger<ClientVerifier> logger)
         return true;
     }
 
+    /// <summary>The Windows account (SID) of the program on the other end of the pipe, read from its process token.</summary>
+    public static string? GetClientUserSid(NamedPipeServerStream pipe)
+    {
+        if (!GetNamedPipeClientProcessId(pipe.SafePipeHandle, out var pid))
+        {
+            return null;
+        }
+
+        var process = OpenProcess(ProcessQueryLimitedInformation, false, pid);
+        if (process == IntPtr.Zero)
+        {
+            return null;
+        }
+
+        try
+        {
+            if (!OpenProcessToken(process, TokenQuery, out var token))
+            {
+                return null;
+            }
+
+            try
+            {
+                using var identity = new System.Security.Principal.WindowsIdentity(token);
+                return identity.User?.Value;
+            }
+            finally
+            {
+                CloseHandle(token);
+            }
+        }
+        finally
+        {
+            CloseHandle(process);
+        }
+    }
+
     private static string? GetClientImagePath(NamedPipeServerStream pipe)
     {
         if (!GetNamedPipeClientProcessId(pipe.SafePipeHandle, out var pid))
@@ -59,6 +96,10 @@ public sealed class ClientVerifier(ILogger<ClientVerifier> logger)
     }
 
     private const uint ProcessQueryLimitedInformation = 0x1000;
+    private const uint TokenQuery = 0x0008;
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    private static extern bool OpenProcessToken(IntPtr process, uint desiredAccess, out IntPtr token);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool GetNamedPipeClientProcessId(Microsoft.Win32.SafeHandles.SafePipeHandle pipe, out uint clientProcessId);

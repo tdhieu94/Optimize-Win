@@ -36,6 +36,23 @@ if (args.Contains("--self-test"))
         Console.WriteLine($"  {item.SizeBytes / 1048576.0,8:0.0} MB  {item.Name}");
     }
 
+    // Read-only junk scan for the account running the test (nothing is moved).
+    if (OperatingSystem.IsWindows())
+    {
+        var sid = System.Security.Principal.WindowsIdentity.GetCurrent().User?.Value;
+        var junkScan = new JunkService(null!, TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger<JunkService>.Instance).Scan(sid);
+        Console.WriteLine($"Junk scan for {sid}: {junkScan.Note}");
+        foreach (var c in junkScan.Categories)
+        {
+            Console.WriteLine($"  {c.Id}: {c.FileCount} files, {c.Bytes / 1048576.0:0.0} MB");
+        }
+
+        if (junkScan.Categories.Count == 0)
+        {
+            return 1;
+        }
+    }
+
     return disks.Count > 0 && scan.Root.FileCount > 0 ? 0 : 1;
 }
 
@@ -50,6 +67,7 @@ builder.Services.AddSingleton(_ => new QuarantineStore(paths.QuarantineDirectory
 builder.Services.AddSingleton(_ => PathGuard.CreateForCurrentMachine());
 builder.Services.AddSingleton<SafeExecutor>();
 builder.Services.AddSingleton<SpaceService>();
+builder.Services.AddSingleton<JunkService>();
 builder.Services.AddSingleton<OwServiceImpl>();
 builder.Services.AddSingleton<ClientVerifier>();
 builder.Services.AddHostedService<MaintenanceWorker>();

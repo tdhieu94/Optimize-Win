@@ -30,7 +30,25 @@ public interface IOwService
 
     /// <summary>Stops the running space scan, if any.</summary>
     Task CancelSpaceScanAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Read-only: looks for junk files of the signed-in user (temporary files, crash dumps).
+    /// The service decides which folders; the UI cannot name a path.
+    /// </summary>
+    Task<JunkScanSummary> ScanJunkAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Moves the files found by <paramref name="scanId"/> in the chosen categories into quarantine
+    /// through the safe executor. Undoable for the retention period.
+    /// </summary>
+    Task<CleanSummary> CleanJunkAsync(Guid scanId, IReadOnlyList<string> categoryIds, CancellationToken cancellationToken = default);
 }
+
+public sealed record JunkCategoryInfo(string Id, string Title, string Description, int FileCount, long Bytes);
+
+public sealed record JunkScanSummary(Guid ScanId, IReadOnlyList<JunkCategoryInfo> Categories, string? Note);
+
+public sealed record CleanSummary(Guid BatchId, int Done, int Skipped, int Failed, long Bytes, string Message);
 
 /// <param name="Error">Vietnamese message if the last scan failed or was stopped.</param>
 public sealed record SpaceScanStatus(
