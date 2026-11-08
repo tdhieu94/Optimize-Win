@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="OW.App.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Optimize Win">
+    <ScrollViewer>
+        <StackPanel MaxWidth="720" Margin="32" Spacing="16">
+            <TextBlock Text="Optimize Win" Style="{StaticResource TitleLargeTextBlockStyle}" />
+            <TextBlock
+                Text="Bản nền tảng (giai đoạn 0). Chưa có chức năng dọn dẹp; bản này chỉ kiểm tra rằng ứng dụng nói chuyện được với dịch vụ OW một cách an toàn."
+                TextWrapping="Wrap"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+            <InfoBar
+                x:Name="StatusBar"
+                IsOpen="True"
+                IsClosable="False"
+                Severity="Informational"
+                Title="Đang kiểm tra dịch vụ OW..." />
+
+            <Button x:Name="RetryButton" Content="Kiểm tra lại" Click="OnRetryClick" />
+
+            <TextBlock Text="Lịch sử dọn dẹp" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,16,0,0" />
+            <TextBlock
+                x:Name="HistoryText"
+                Text="Chưa có lần dọn nào."
+                TextWrapping="Wrap"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+        </StackPanel>
+    </ScrollViewer>
+</Window>

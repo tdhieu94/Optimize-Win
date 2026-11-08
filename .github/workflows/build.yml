@@ -1,0 +1,87 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Test safety layer
+        run: dotnet test tests/OW.Core.Tests/OW.Core.Tests.csproj -c Release
+
+      - name: Publish service
+        run: dotnet publish src/OW.Service/OW.Service.csproj -c Release -r win-x64 --self-contained -o out/OptimizeWin/Service
+
+      - name: Publish app
+        run: dotnet publish src/OW.App/OW.App.csproj -c Release -r win-x64 --self-contained -p:Platform=x64 -o out/OptimizeWin
+
+      - name: Add install scripts
+        shell: pwsh
+        run: |
+          Copy-Item scripts/install.ps1, scripts/uninstall.ps1, scripts/Cai-dat.cmd, scripts/Go-cai-dat.cmd out/OptimizeWin/
+          if (-not (Test-Path out/OptimizeWin/OptimizeWin.exe)) { throw 'OptimizeWin.exe missing' }
+          Get-ChildItem out/OptimizeWin -Filter *.pri | Format-Table Name, Length
+          if (-not (Get-ChildItem out/OptimizeWin -Filter *.pri)) { throw 'No .pri resource file in the app output; XAML pages would not load' }
+          if (-not (Test-Path out/OptimizeWin/Service/OptimizeWin.Service.exe)) { throw 'service exe missing' }
+
+      - name: Smoke test - install like Hieu does, then open the app
+        shell: pwsh
+        run: |
+          & out/OptimizeWin/install.ps1 -Quiet
+          $svc = Get-Service OptimizeWinService
+          Write-Host "Service status: $($svc.Status)"
+          if ($svc.Status -ne 'Running') { throw 'OptimizeWinService is not running after install' }
+
+          $start = Get-Date
+          $exe = Join-Path $env:ProgramFiles 'OptimizeWin\OptimizeWin.exe'
+          $p = Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -PassThru
+          Start-Sleep -Seconds 20
+          $p.Refresh()
+          $crash = Join-Path $env:LOCALAPPDATA 'OptimizeWin\crash.log'
+          $hadCrash = Test-Path $crash
+          if ($hadCrash) { Get-Content $crash }
+          if ($p.HasExited) {
+            Write-Host "App exited with code $($p.ExitCode)"
+            Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $start } -ErrorAction SilentlyContinue |
+              Where-Object { $_.ProviderName -in '.NET Runtime', 'Application Error', 'Windows Error Reporting' } |
+              Format-List TimeCreated, ProviderName, Id, Message
+            throw 'OptimizeWin.exe closed by itself during start-up'
+          }
+          Stop-Process -Id $p.Id -Force
+          # An error dialog keeps the process alive, so a crash log also counts as a failure.
+          if ($hadCrash) { throw 'The main window reported an error (see crash.log above)' }
+          Write-Host 'Main window is still running after 20 seconds with no errors'
+
+      - name: Smoke test - fallback window
+        shell: pwsh
+        run: |
+          $env:OW_TEST_FALLBACK = '1'
+          Remove-Item (Join-Path $env:LOCALAPPDATA 'OptimizeWin\crash.log') -ErrorAction SilentlyContinue
+          $exe = Join-Path $env:ProgramFiles 'OptimizeWin\OptimizeWin.exe'
+          $p = Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -PassThru
+          Start-Sleep -Seconds 20
+          $p.Refresh()
+          $crash = Join-Path $env:LOCALAPPDATA 'OptimizeWin\crash.log'
+          if (Test-Path $crash) { Get-Content $crash }
+          if ($p.HasExited) { throw "Fallback window closed by itself (exit code $($p.ExitCode))" }
+          Write-Host 'Fallback window is still running after 20 seconds'
+          Stop-Process -Id $p.Id -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OptimizeWin-${{ github.sha }}
+          path: out/OptimizeWin
+          retention-days: 30
