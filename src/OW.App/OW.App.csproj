@@ -25,5 +25,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\OW.Client\OW.Client.csproj" />
+    <ProjectReference Include="..\OW.Core\OW.Core.csproj" />
   </ItemGroup>
 </Project>

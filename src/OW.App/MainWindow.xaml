@@ -29,6 +29,9 @@
             <TextBlock Text="Dung lượng" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,16,0,0" />
             <StackPanel x:Name="SpacePanel" />
 
+            <TextBlock Text="Khởi động cùng Windows" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,16,0,0" />
+            <StackPanel x:Name="StartupPanel" />
+
             <TextBlock Text="Lịch sử dọn dẹp" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,16,0,0" />
             <TextBlock
                 x:Name="HistoryText"

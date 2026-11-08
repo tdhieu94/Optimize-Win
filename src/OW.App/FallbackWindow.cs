@@ -37,6 +37,8 @@ internal sealed class FallbackWindow : Window
         panel.Children.Add(_disks);
         panel.Children.Add(new TextBlock { Text = "Dung lượng", FontSize = 18, Margin = new Thickness(0, 16, 0, 0) });
         panel.Children.Add(_space.Root);
+        panel.Children.Add(new TextBlock { Text = "Khởi động cùng Windows", FontSize = 18, Margin = new Thickness(0, 16, 0, 0) });
+        panel.Children.Add(new StartupView().Root);
         panel.Children.Add(new TextBlock { Text = "Lịch sử dọn dẹp", FontSize = 18, Margin = new Thickness(0, 16, 0, 0) });
         panel.Children.Add(_history);
         Content = new ScrollViewer { Content = panel };
