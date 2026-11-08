@@ -22,6 +22,7 @@ internal sealed class AppPages
     private readonly SpaceView _space = new();
     private readonly StartupView _startup = new();
     private readonly CleanupView _cleanup = new();
+    private readonly DuplicatesView _duplicates = new();
     private readonly StackPanel _disks = new() { Spacing = 12 };
     private readonly UpdateView _update = new();
     private bool _checkedForUpdate;
@@ -44,17 +45,21 @@ internal sealed class AppPages
         var cleanTile = new Tile("", "Dọn rác", "Tìm file tạm và file rác an toàn để dọn", "Quét rác", () => NavigateRequested?.Invoke("clean"));
         _historyTile = new Tile("", "Lịch sử & hoàn tác", "Chưa có lần dọn nào", "Xem lịch sử", () => NavigateRequested?.Invoke("history"));
 
+        _duplicates.Removed += () => RetryRequested?.Invoke();
+        var dupTile = new Tile("\uE8C8", "File trùng nhau", "Tìm ảnh, video, tài liệu bị lưu nhiều bản", "Tìm file trùng", () => NavigateRequested?.Invoke("duplicates"));
+
         _startup.Counted += (total, on) => _startupTile.Value = total == 0
             ? "Không có chương trình nào tự khởi động"
             : $"{on} chương trình đang bật, {total - on} đã tắt";
 
         Pages =
         [
-            new("home", "Tổng quan", "", Home(spaceTile, cleanTile)),
+            new("home", "Tổng quan", "", Home(spaceTile, cleanTile, dupTile)),
             new("disks", "Ổ đĩa", "", Page("Ổ đĩa", "Sức khỏe và dung lượng của từng ổ cứng, đọc từ Windows. Chỉ xem, không thay đổi gì.", _disks)),
             new("space", "Dung lượng", "", Page("Dung lượng", null, _space.Root)),
             new("startup", "Khởi động", "", Page("Khởi động cùng Windows", null, _startup.Root)),
             new("clean", "Dọn rác", "", Page("Dọn rác", null, _cleanup.CleanRoot)),
+            new("duplicates", "File trùng", "\uE8C8", Page("File trùng nhau", null, _duplicates.Root)),
             new("history", "Lịch sử", "", Page("Lịch sử dọn dẹp", "Mỗi lần dọn đều được ghi lại. Bấm \"Hoàn tác\" để lấy lại file trong vòng 7 ngày.", _cleanup.HistoryRoot)),
         ];
 
@@ -103,6 +108,7 @@ internal sealed class AppPages
 
         DiskCards.Fill(_disks, status.Disks);
         _space.SetDrives(status.Disks);
+        _duplicates.SetDrives(status.Disks);
         _diskTile.Value = DiskSummary(status.Disks);
         _diskTile.Accent = status.Disks.Any(d => d.Verdict == "Danger") ? Colors.Firebrick
             : status.Disks.Any(d => d.Verdict == "Attention") ? Colors.DarkOrange
@@ -146,7 +152,7 @@ internal sealed class AppPages
         return real.All(d => d.Verdict == "Good") ? $"{real.Count} ổ, tất cả đều tốt" : $"{real.Count} ổ đĩa";
     }
 
-    private FrameworkElement Home(Tile spaceTile, Tile cleanTile)
+    private FrameworkElement Home(Tile spaceTile, Tile cleanTile, Tile dupTile)
     {
         var status = new Grid { ColumnSpacing = 12 };
         status.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -168,7 +174,7 @@ internal sealed class AppPages
             ItemWidth = 290,
             ItemHeight = 190,
         };
-        foreach (var t in new[] { _diskTile, spaceTile, _startupTile, cleanTile, _historyTile })
+        foreach (var t in new[] { _diskTile, spaceTile, _startupTile, cleanTile, dupTile, _historyTile })
         {
             tiles.Children.Add(t.Root);
         }

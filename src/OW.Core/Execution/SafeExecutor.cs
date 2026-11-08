@@ -216,7 +216,7 @@ public sealed class SafeExecutor
 
         // Record first, act second: a crash between the two is settled by RecoverInterrupted().
         var opId = Guid.NewGuid();
-        var backupPath = _quarantine.GetBackupPath(batchId, opId);
+        var backupPath = _quarantine.GetBackupPath(batchId, opId, action.Path);
         var op = _journal.AddOperation(batchId, sequence, OperationKind.QuarantineFile, action.Path, backupPath, info.Length, OperationState.Pending, id: opId);
 
         try
