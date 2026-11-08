@@ -35,11 +35,17 @@ jobs:
           if (-not (Test-Path out/OptimizeWin/OptimizeWin.exe)) { throw 'OptimizeWin.exe missing' }
           if (-not (Test-Path out/OptimizeWin/Service/OptimizeWin.Service.exe)) { throw 'service exe missing' }
 
-      - name: Smoke test - app window stays open
+      - name: Smoke test - install like Hieu does, then open the app
         shell: pwsh
         run: |
+          & out/OptimizeWin/install.ps1 -Quiet
+          $svc = Get-Service OptimizeWinService
+          Write-Host "Service status: $($svc.Status)"
+          if ($svc.Status -ne 'Running') { throw 'OptimizeWinService is not running after install' }
+
           $start = Get-Date
-          $p = Start-Process -FilePath out/OptimizeWin/OptimizeWin.exe -PassThru
+          $exe = Join-Path $env:ProgramFiles 'OptimizeWin\OptimizeWin.exe'
+          $p = Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -PassThru
           Start-Sleep -Seconds 20
           $p.Refresh()
           $crash = Join-Path $env:LOCALAPPDATA 'OptimizeWin\crash.log'

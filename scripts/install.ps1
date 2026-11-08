@@ -6,6 +6,7 @@
   - Tạo lối tắt trong Start Menu.
   Chạy qua file "Cai-dat.cmd" để Windows tự hỏi quyền admin.
 #>
+param([switch]$Quiet)
 $ErrorActionPreference = 'Stop'
 
 $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
@@ -58,4 +59,4 @@ $shortcut.Save()
 
 Write-Host ''
 Write-Host 'Cài đặt xong. Mở "Optimize Win" từ Start Menu.' -ForegroundColor Green
-Read-Host 'Nhấn Enter để đóng'
+if (-not $Quiet) { Read-Host 'Nhấn Enter để đóng' }
